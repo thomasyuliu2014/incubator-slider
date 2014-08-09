@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.slider.api.ClusterDescription;
@@ -55,6 +56,9 @@ import org.apache.slider.providers.agent.application.metadata.Component;
 import org.apache.slider.providers.agent.application.metadata.Export;
 import org.apache.slider.providers.agent.application.metadata.ExportGroup;
 import org.apache.slider.providers.agent.application.metadata.Metainfo;
+import org.apache.slider.providers.agent.application.metadata.OSPackage;
+import org.apache.slider.providers.agent.application.metadata.OSSpecific;
+import org.apache.slider.server.appmaster.actions.ProviderReportedContainerLoss;
 import org.apache.slider.server.appmaster.state.StateAccessForProviders;
 import org.apache.slider.server.appmaster.web.rest.agent.AgentCommandType;
 import org.apache.slider.server.appmaster.web.rest.agent.AgentRestOperations;
@@ -85,6 +89,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -107,25 +112,31 @@ public class AgentProviderService extends AbstractProviderService implements
   private static final String CONTAINER_ID = "container_id";
   private static final String GLOBAL_CONFIG_TAG = "global";
   private static final String LOG_FOLDERS_TAG = "LogFolders";
+  private static final String COMPONENT_DATA_TAG = "ComponentInstanceData";
+  private static final String SHARED_PORT_TAG = "SHARED";
+  private static final String DO_NOT_PROPAGATE_TAG = "{DO_NOT_PROPAGATE}";
   private static final int MAX_LOG_ENTRIES = 20;
   private static final int DEFAULT_HEARTBEAT_MONITOR_INTERVAL = 60 * 1000;
+
   private final Object syncLock = new Object();
-  private final Map<String, String> allocatedPorts = new ConcurrentHashMap<>();
   private int heartbeatMonitorInterval = 0;
   private AgentClientProvider clientProvider;
-  private Map<String, ComponentInstanceState> componentStatuses = new ConcurrentHashMap<>();
   private AtomicInteger taskId = new AtomicInteger(0);
   private volatile Metainfo metainfo = null;
   private ComponentCommandOrder commandOrder = null;
   private HeartbeatMonitor monitor;
-  private Map<String, String> workFolders =
+  private Boolean canAnyMasterPublish = null;
+  private AgentLaunchParameter agentLaunchParameter = null;
+
+  private final Map<String, ComponentInstanceState> componentStatuses = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, String>> componentInstanceData = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, String>> allocatedPorts = new ConcurrentHashMap<>();
+  private final Map<String, String> workFolders =
       Collections.synchronizedMap(new LinkedHashMap<String, String>(MAX_LOG_ENTRIES, 0.75f, false) {
         protected boolean removeEldestEntry(Map.Entry eldest) {
           return size() > MAX_LOG_ENTRIES;
         }
       });
-  private Boolean canAnyMasterPublish = null;
-  private AgentLaunchParameter agentLaunchParameter = null;
 
   /**
    * Create an instance of AgentProviderService
@@ -208,7 +219,11 @@ public class AgentProviderService extends AbstractProviderService implements
     String logDir = ApplicationConstants.Environment.LOG_DIRS.$();
     launcher.setEnv("AGENT_LOG_ROOT", logDir);
     log.info("AGENT_LOG_ROOT set to {}", logDir);
-    launcher.setEnv(HADOOP_USER_NAME, System.getenv(HADOOP_USER_NAME));
+    if (System.getenv(HADOOP_USER_NAME) != null) {
+      launcher.setEnv(HADOOP_USER_NAME, System.getenv(HADOOP_USER_NAME));
+    }
+    // for 2-Way SSL
+    launcher.setEnv(SLIDER_PASSPHRASE, SliderKeys.PASSPHRASE);
 
     //local resources
 
@@ -234,11 +249,13 @@ public class AgentProviderService extends AbstractProviderService implements
     launcher.addLocalResource(AgentKeys.APP_DEFINITION_DIR, appDefRes);
 
     String agentConf = instanceDefinition.getAppConfOperations().
-        getGlobalOptions().getMandatoryOption(AgentKeys.AGENT_CONF);
-    LocalResource agentConfRes = fileSystem.createAmResource(
-        fileSystem.getFileSystem().resolvePath(new Path(agentConf)),
-        LocalResourceType.FILE);
-    launcher.addLocalResource(AgentKeys.AGENT_CONFIG_FILE, agentConfRes);
+        getGlobalOptions().getOption(AgentKeys.AGENT_CONF, "");
+    if (org.apache.commons.lang.StringUtils.isNotEmpty(agentConf)) {
+      LocalResource agentConfRes = fileSystem.createAmResource(fileSystem
+          .getFileSystem().resolvePath(new Path(agentConf)),
+          LocalResourceType.FILE);
+      launcher.addLocalResource(AgentKeys.AGENT_CONFIG_FILE, agentConfRes);
+    }
 
     String agentVer = instanceDefinition.getAppConfOperations().
         getGlobalOptions().getOption(AgentKeys.AGENT_VERSION, null);
@@ -259,7 +276,9 @@ public class AgentProviderService extends AbstractProviderService implements
     operation.add(ARG_HOST);
     operation.add(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
     operation.add(ARG_PORT);
-    operation.add(getClusterInfoPropertyValue(StatusKeys.INFO_AM_WEB_PORT));
+    operation.add(getClusterInfoPropertyValue(StatusKeys.INFO_AM_AGENT_PORT));
+    operation.add(ARG_SECURED_PORT);
+    operation.add(getClusterInfoPropertyValue(StatusKeys.INFO_AM_SECURED_AGENT_PORT));
 
     String debugCmd = agentLaunchParameter.getNextLaunchParameter(role);
     if (debugCmd != null && debugCmd.length() != 0) {
@@ -270,11 +289,213 @@ public class AgentProviderService extends AbstractProviderService implements
     launcher.addCommand(operation.build());
 
     // initialize the component instance state
-    componentStatuses.put(label,
-                          new ComponentInstanceState(
-                              role,
-                              container.getId().toString(),
-                              getClusterInfoPropertyValue(OptionKeys.APPLICATION_NAME)));
+    getComponentStatuses().put(label,
+                               new ComponentInstanceState(
+                                   role,
+                                   container.getId(),
+                                   getClusterInfoPropertyValue(OptionKeys.APPLICATION_NAME)));
+  }
+
+  /**
+   * Run this service
+   *
+   * @param instanceDefinition component description
+   * @param confDir            local dir with the config
+   * @param env                environment variables above those generated by
+   * @param execInProgress     callback for the event notification
+   *
+   * @throws IOException     IO problems
+   * @throws SliderException anything internal
+   */
+  @Override
+  public boolean exec(AggregateConf instanceDefinition,
+                      File confDir,
+                      Map<String, String> env,
+                      ProviderCompleted execInProgress) throws
+      IOException,
+      SliderException {
+
+    return false;
+  }
+
+  @Override
+  public boolean isSupportedRole(String role) {
+    return true;
+  }
+
+  /**
+   * Handle registration calls from the agents
+   * @param registration
+   * @return
+   */
+  @Override
+  public RegistrationResponse handleRegistration(Register registration) {
+    RegistrationResponse response = new RegistrationResponse();
+    String label = registration.getHostname();
+    if (getComponentStatuses().containsKey(label)) {
+      response.setResponseStatus(RegistrationStatus.OK);
+      getComponentStatuses().get(label).heartbeat(System.currentTimeMillis());
+    } else {
+      response.setResponseStatus(RegistrationStatus.FAILED);
+      response.setLog("Label not recognized.");
+      log.warn("Received registration request from unknown label {}", label);
+    }
+    return response;
+  }
+
+  /**
+   * Handle heartbeat response from agents
+   * @param heartBeat
+   * @return
+   */
+  @Override
+  public HeartBeatResponse handleHeartBeat(HeartBeat heartBeat) {
+    HeartBeatResponse response = new HeartBeatResponse();
+    long id = heartBeat.getResponseId();
+    response.setResponseId(id + 1L);
+
+    String label = heartBeat.getHostname();
+    String roleName = getRoleName(label);
+
+    String containerId = getContainerId(label);
+    StateAccessForProviders accessor = getAmState();
+    String scriptPath = getScriptPathFromMetainfo(roleName);
+
+    if (scriptPath == null) {
+      log.error("role.script is unavailable for " + roleName + ". Commands will not be sent.");
+      return response;
+    }
+
+    if (!getComponentStatuses().containsKey(label)) {
+      return response;
+    }
+
+    Boolean isMaster = isMaster(roleName);
+    ComponentInstanceState componentStatus = getComponentStatuses().get(label);
+    componentStatus.heartbeat(System.currentTimeMillis());
+    // If no Master can explicitly publish then publish if its a master
+    // Otherwise, wait till the master that can publish is ready
+    if (isMaster &&
+        (canAnyMasterPublishConfig() == false || canPublishConfig(roleName))) {
+      publishConfigAndExportGroups(heartBeat, componentStatus);
+    }
+
+    List<CommandReport> reports = heartBeat.getReports();
+    if (reports != null && !reports.isEmpty()) {
+      CommandReport report = reports.get(0);
+      Map<String, String> ports = report.getAllocatedPorts();
+      if (ports != null && !ports.isEmpty()) {
+        for (Map.Entry<String, String> port : ports.entrySet()) {
+          log.info("Recording allocated port for {} as {}", port.getKey(), port.getValue());
+          this.getAllocatedPorts().put(port.getKey(), port.getValue());
+          this.getAllocatedPorts(containerId).put(port.getKey(), port.getValue());
+        }
+
+        // component specific publishes
+        processAndPublishComponentSpecificData(ports, containerId, heartBeat.getFqdn(), roleName);
+      }
+      CommandResult result = CommandResult.getCommandResult(report.getStatus());
+      Command command = Command.getCommand(report.getRoleCommand());
+      componentStatus.applyCommandResult(result, command);
+      log.info("Component operation. Status: {}", result);
+
+      if (command == Command.INSTALL && report.getFolders() != null && report.getFolders().size() > 0) {
+        publishLogFolderPaths(report.getFolders(), containerId, heartBeat.getFqdn());
+      }
+    }
+
+    int waitForCount = accessor.getInstanceDefinitionSnapshot().
+        getAppConfOperations().getComponentOptInt(roleName, AgentKeys.WAIT_HEARTBEAT, 0);
+
+    if (id < waitForCount) {
+      log.info("Waiting until heartbeat count {}. Current val: {}", waitForCount, id);
+      getComponentStatuses().put(roleName, componentStatus);
+      return response;
+    }
+
+    Command command = componentStatus.getNextCommand();
+    try {
+      if (Command.NOP != command) {
+        if (command == Command.INSTALL) {
+          log.info("Installing {} on {}.", roleName, containerId);
+          addInstallCommand(roleName, containerId, response, scriptPath);
+          componentStatus.commandIssued(command);
+        } else if (command == Command.START) {
+          // check against dependencies
+          boolean canExecute = commandOrder.canExecute(roleName, command, getComponentStatuses().values());
+          if (canExecute) {
+            log.info("Starting {} on {}.", roleName, containerId);
+            addStartCommand(roleName, containerId, response, scriptPath);
+            componentStatus.commandIssued(command);
+          } else {
+            log.info("Start of {} on {} delayed as dependencies have not started.", roleName, containerId);
+          }
+        }
+      }
+      // if there is no outstanding command then retrieve config
+      if (isMaster && componentStatus.getState() == State.STARTED
+          && command == Command.NOP) {
+        if (!componentStatus.getConfigReported()) {
+          addGetConfigCommand(roleName, containerId, response);
+        }
+      }
+    } catch (SliderException e) {
+      componentStatus.applyCommandResult(CommandResult.FAILED, command);
+      log.warn("Component instance failed operation.", e);
+    }
+
+    return response;
+  }
+
+  @Override
+  public Map<String, String> buildMonitorDetails(ClusterDescription clusterDesc) {
+    Map<String, String> details = super.buildMonitorDetails(clusterDesc);
+    buildRoleHostDetails(details);
+    return details;
+  }
+
+  @Override
+  public void applyInitialRegistryDefinitions(URL unsecureWebAPI,
+                                              URL secureWebAPI,
+                                              ServiceInstanceData instanceData) throws IOException {
+    super.applyInitialRegistryDefinitions(unsecureWebAPI,
+                                          secureWebAPI,
+                                          instanceData
+    );
+
+    try {
+      instanceData.internalView.endpoints.put(
+          CustomRegistryConstants.AGENT_REST_API,
+          new RegisteredEndpoint(
+              new URL(secureWebAPI, SLIDER_PATH_AGENTS),
+              "Agent REST API"));
+    } catch (URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
+  public void notifyContainerCompleted(ContainerId containerId) {
+    if (containerId != null) {
+      String containerIdStr = containerId.toString();
+      if (getComponentInstanceData().containsKey(containerIdStr)) {
+        getComponentInstanceData().remove(containerIdStr);
+        log.info("Removing container specific data for {}", containerIdStr);
+        publishComponentInstanceData();
+      }
+
+      if (this.allocatedPorts.containsKey(containerIdStr)) {
+        this.allocatedPorts.remove(containerIdStr);
+      }
+
+      synchronized (this.componentStatuses) {
+        for (String label : getComponentStatuses().keySet()) {
+          if (label.startsWith(containerIdStr)) {
+            getComponentStatuses().remove(label);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -332,13 +553,13 @@ public class AgentProviderService extends AbstractProviderService implements
   }
 
   /**
-   * Publish a named config bag that may contain name-value pairs for app configurations such as hbase-site
+   * Publish a named property bag that may contain name-value pairs for app configurations such as hbase-site
    * @param name
    * @param description
    * @param entries
    */
-  protected void publishComponentConfiguration(String name, String description,
-                                               Iterable<Map.Entry<String, String>> entries) {
+  protected void publishApplicationInstanceData(String name, String description,
+                                                Iterable<Map.Entry<String, String>> entries) {
     PublishedConfiguration pubconf = new PublishedConfiguration();
     pubconf.description = description;
     pubconf.putValues(entries);
@@ -370,43 +591,16 @@ public class AgentProviderService extends AbstractProviderService implements
 
   /**
    * Lost heartbeat from the container - release it and ask for a replacement
+   * (async operation)
+   *  @param label
+   * @param containerId
    *
-   * @param label
-   *
-   * @return if release is requested successfully
    */
-  protected boolean releaseContainer(String label) {
-    componentStatuses.remove(label);
-    try {
-      getAppMaster().refreshContainer(getContainerId(label), true);
-    } catch (SliderException e) {
-      log.info("Error while requesting container release for {}. Message: {}", label, e.getMessage());
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Run this service
-   *
-   * @param instanceDefinition component description
-   * @param confDir            local dir with the config
-   * @param env                environment variables above those generated by
-   * @param execInProgress     callback for the event notification
-   *
-   * @throws IOException     IO problems
-   * @throws SliderException anything internal
-   */
-  @Override
-  public boolean exec(AggregateConf instanceDefinition,
-                      File confDir,
-                      Map<String, String> env,
-                      ProviderCompleted execInProgress) throws
-      IOException,
-      SliderException {
-
-    return false;
+  protected void lostContainer(
+      String label,
+      ContainerId containerId) {
+    getComponentStatuses().remove(label);
+    getQueueAccess().put(new ProviderReportedContainerLoss(containerId));
   }
 
   /**
@@ -419,165 +613,57 @@ public class AgentProviderService extends AbstractProviderService implements
     return stats;
   }
 
-  @Override
-  public boolean isSupportedRole(String role) {
-    return true;
-  }
 
   /**
-   * Handle registration calls from the agents
-   * @param registration
-   * @return
-   */
-  @Override
-  public RegistrationResponse handleRegistration(Register registration) {
-    RegistrationResponse response = new RegistrationResponse();
-    String label = registration.getHostname();
-    if (componentStatuses.containsKey(label)) {
-      response.setResponseStatus(RegistrationStatus.OK);
-      componentStatuses.get(label).setLastHeartbeat(System.currentTimeMillis());
-    } else {
-      response.setResponseStatus(RegistrationStatus.FAILED);
-      response.setLog("Label not recognized.");
-    }
-    return response;
-  }
-
-  /**
-   * Handle heartbeat response from agents
-   * @param heartBeat
-   * @return
-   */
-  @Override
-  public HeartBeatResponse handleHeartBeat(HeartBeat heartBeat) {
-    HeartBeatResponse response = new HeartBeatResponse();
-    long id = heartBeat.getResponseId();
-    response.setResponseId(id + 1L);
-
-    String label = heartBeat.getHostname();
-    String roleName = getRoleName(label);
-
-    String containerId = getContainerId(label);
-    StateAccessForProviders accessor = getAmState();
-    String scriptPath = getScriptPathFromMetainfo(roleName);
-
-    if (scriptPath == null) {
-      log.error("role.script is unavailable for " + roleName + ". Commands will not be sent.");
-      return response;
-    }
-
-    if (!componentStatuses.containsKey(label)) {
-      return response;
-    }
-
-    Boolean isMaster = isMaster(roleName);
-    ComponentInstanceState componentStatus = componentStatuses.get(label);
-    componentStatus.setLastHeartbeat(System.currentTimeMillis());
-    // If no Master can explicitly publish then publish if its a master
-    // Otherwise, wait till the master that can publish is ready
-    if (isMaster &&
-        (canAnyMasterPublishConfig() == false || canPublishConfig(roleName))) {
-      processReturnedStatus(heartBeat, componentStatus);
-    }
-
-    List<CommandReport> reports = heartBeat.getReports();
-    if (reports != null && !reports.isEmpty()) {
-      CommandReport report = reports.get(0);
-      Map<String, String> ports = report.getAllocatedPorts();
-      if (ports != null && !ports.isEmpty()) {
-        for (Map.Entry<String, String> port : ports.entrySet()) {
-          log.info("Recording allocated port for {} as {}", port.getKey(), port.getValue());
-          this.allocatedPorts.put(port.getKey(), port.getValue());
-        }
-      }
-      CommandResult result = CommandResult.getCommandResult(report.getStatus());
-      Command command = Command.getCommand(report.getRoleCommand());
-      componentStatus.applyCommandResult(result, command);
-      log.info("Component operation. Status: {}", result);
-
-      if (command == Command.INSTALL && report.getFolders() != null && report.getFolders().size() > 0) {
-        processFolderPaths(report.getFolders(), containerId, heartBeat.getFqdn());
-      }
-    }
-
-    int waitForCount = accessor.getInstanceDefinitionSnapshot().
-        getAppConfOperations().getComponentOptInt(roleName, AgentKeys.WAIT_HEARTBEAT, 0);
-
-    if (id < waitForCount) {
-      log.info("Waiting until heartbeat count {}. Current val: {}", waitForCount, id);
-      componentStatuses.put(roleName, componentStatus);
-      return response;
-    }
-
-    Command command = componentStatus.getNextCommand();
-    try {
-      if (Command.NOP != command) {
-        if (command == Command.INSTALL) {
-          log.info("Installing {} on {}.", roleName, containerId);
-          addInstallCommand(roleName, containerId, response, scriptPath);
-          componentStatus.commandIssued(command);
-        } else if (command == Command.START) {
-          // check against dependencies
-          boolean canExecute = commandOrder.canExecute(roleName, command, componentStatuses.values());
-          if (canExecute) {
-            log.info("Starting {} on {}.", roleName, containerId);
-            addStartCommand(roleName, containerId, response, scriptPath);
-            componentStatus.commandIssued(command);
-          } else {
-            log.info("Start of {} on {} delayed as dependencies have not started.", roleName, containerId);
-          }
-        }
-      }
-      // if there is no outstanding command then retrieve config
-      if (isMaster && componentStatus.getState() == State.STARTED
-          && command == Command.NOP) {
-        if (!componentStatus.getConfigReported()) {
-          addGetConfigCommand(roleName, containerId, response);
-        }
-      }
-    } catch (SliderException e) {
-      componentStatus.applyCommandResult(CommandResult.FAILED, command);
-      log.warn("Component instance failed operation.", e);
-    }
-
-    return response;
-  }
-
-  /**
-   * Format the folder locations before publishing in the registry service
+   * Format the folder locations and publish in the registry service
    * @param folders
    * @param containerId
    * @param hostFqdn
    */
-  private void processFolderPaths(Map<String, String> folders, String containerId, String hostFqdn) {
+  private void publishLogFolderPaths(Map<String, String> folders, String containerId, String hostFqdn) {
     for (String key : folders.keySet()) {
       workFolders.put(String.format("%s-%s-%s", hostFqdn, containerId, key), folders.get(key));
     }
 
-    publishComponentConfiguration(LOG_FOLDERS_TAG, LOG_FOLDERS_TAG, (new HashMap<>(this.workFolders)).entrySet());
+    publishApplicationInstanceData(LOG_FOLDERS_TAG, LOG_FOLDERS_TAG, (new HashMap<>(this.workFolders)).entrySet());
   }
+
 
   /**
    * Process return status for component instances
    * @param heartBeat
    * @param componentStatus
    */
-  protected void processReturnedStatus(HeartBeat heartBeat, ComponentInstanceState componentStatus) {
+  protected void publishConfigAndExportGroups(HeartBeat heartBeat, ComponentInstanceState componentStatus) {
     List<ComponentStatus> statuses = heartBeat.getComponentStatus();
     if (statuses != null && !statuses.isEmpty()) {
       log.info("Processing {} status reports.", statuses.size());
+      Application application = getMetainfo().getApplication();
+      List<ExportGroup> exportGroups = application.getExportGroups();
+      boolean hasExportGroups = exportGroups != null && !exportGroups.isEmpty();
+      Set<String> exportedConfigs = new HashSet();
+      String exportedConfigsStr = application.getExportedConfigs();
+      boolean exportedAllConfigs = exportedConfigsStr == null || exportedConfigsStr.isEmpty();
+      if (application.getExportedConfigs() != null && application.getExportedConfigs().length() > 0) {
+        for (String exportedConfig : application.getExportedConfigs().split(",")) {
+          if (exportedConfig.trim().length() > 0) {
+            exportedConfigs.add(exportedConfig.trim());
+          }
+        }
+      }
+
       for (ComponentStatus status : statuses) {
         log.info("Status report: " + status.toString());
         if (status.getConfigs() != null) {
           for (String key : status.getConfigs().keySet()) {
-            Map<String, String> configs = status.getConfigs().get(key);
-            publishComponentConfiguration(key, key, configs.entrySet());
+            if ((!exportedAllConfigs && exportedConfigs.contains(key)) ||
+                exportedAllConfigs) {
+              Map<String, String> configs = status.getConfigs().get(key);
+              publishApplicationInstanceData(key, key, configs.entrySet());
+            }
           }
 
-          Application application = getMetainfo().getApplication();
-          List<ExportGroup> exportGroups = application.getExportGroups();
-          if (exportGroups != null && !exportGroups.isEmpty()) {
-
+          if (hasExportGroups) {
             String configKeyFormat = "${site.%s.%s}";
             String hostKeyFormat = "${%s_HOST}";
 
@@ -612,7 +698,7 @@ public class AgentProviderService extends AbstractProviderService implements
                   map.put(export.getName(), value);
                   log.info("Preparing to publish. Key {} and Value {}", export.getName(), value);
                 }
-                publishComponentConfiguration(exportGroupName, exportGroupName, map.entrySet());
+                publishApplicationInstanceData(exportGroupName, exportGroupName, map.entrySet());
               }
             }
           }
@@ -620,6 +706,70 @@ public class AgentProviderService extends AbstractProviderService implements
         }
       }
     }
+  }
+
+  /** Publish component instance specific data if the component demands it */
+  protected void processAndPublishComponentSpecificData(Map<String, String> ports,
+                                                        String containerId,
+                                                        String hostFqdn,
+                                                        String roleName) {
+    String portVarFormat = "${site.%s}";
+    String hostNamePattern = "${THIS_HOST}";
+    Map<String, String> toPublish = new HashMap<>();
+
+    Application application = getMetainfo().getApplication();
+    for (Component component : application.getComponents()) {
+      if (component.getName().equals(roleName)) {
+        if (component.getExports().size() > 0) {
+
+          for (Export export : component.getExports()) {
+            String templateToExport = export.getValue();
+            for (String portName : ports.keySet()) {
+              boolean publishData = false;
+              String portValPattern = String.format(portVarFormat, portName);
+              if (templateToExport.contains(portValPattern)) {
+                templateToExport = templateToExport.replace(portValPattern, ports.get(portName));
+                publishData = true;
+              }
+              if (templateToExport.contains(hostNamePattern)) {
+                templateToExport = templateToExport.replace(hostNamePattern, hostFqdn);
+                publishData = true;
+              }
+              if (publishData) {
+                toPublish.put(export.getName(), templateToExport);
+                log.info("Publishing {} for name {} and container {}",
+                         templateToExport, export.getName(), containerId);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (toPublish.size() > 0) {
+      Map<String, String> perContainerData = null;
+      if (!getComponentInstanceData().containsKey(containerId)) {
+        perContainerData = new ConcurrentHashMap<>();
+      } else {
+        perContainerData = getComponentInstanceData().get(containerId);
+      }
+      perContainerData.putAll(toPublish);
+      getComponentInstanceData().put(containerId, perContainerData);
+      publishComponentInstanceData();
+    }
+  }
+
+  private void publishComponentInstanceData() {
+    Map<String, String> dataToPublish = new HashMap<>();
+    synchronized (this.componentInstanceData) {
+      for (String container : getComponentInstanceData().keySet()) {
+        for (String prop : getComponentInstanceData().get(container).keySet()) {
+          dataToPublish.put(
+              container + "." + prop, getComponentInstanceData().get(container).get(prop));
+        }
+      }
+    }
+    publishApplicationInstanceData(COMPONENT_DATA_TAG, COMPONENT_DATA_TAG, dataToPublish.entrySet());
   }
 
   /**
@@ -737,7 +887,6 @@ public class AgentProviderService extends AbstractProviderService implements
       throws SliderException {
     assert getAmState().isApplicationLive();
     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
-    ConfTreeOperations resourcesConf = getAmState().getResourcesSnapshot();
     ConfTreeOperations internalsConf = getAmState().getInternalsSnapshot();
 
     ExecutionCommand cmd = new ExecutionCommand(AgentCommandType.EXECUTION_COMMAND);
@@ -750,18 +899,41 @@ public class AgentProviderService extends AbstractProviderService implements
     cmd.setRole(roleName);
     Map<String, String> hostLevelParams = new TreeMap<>();
     hostLevelParams.put(JAVA_HOME, appConf.getGlobalOptions().getMandatoryOption(JAVA_HOME));
-    hostLevelParams.put(PACKAGE_LIST, "[{\"type\":\"tarball\",\"name\":\"" +
-                                      appConf.getGlobalOptions().getMandatoryOption(
-                                          PACKAGE_LIST) + "\"}]");
+    hostLevelParams.put(PACKAGE_LIST, getPackageList());
     hostLevelParams.put(CONTAINER_ID, containerId);
     cmd.setHostLevelParams(hostLevelParams);
 
-    setInstallCommandConfigurations(cmd);
+    setInstallCommandConfigurations(cmd, containerId);
 
     cmd.setCommandParams(setCommandParameters(scriptPath, false));
 
     cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
     response.addExecutionCommand(cmd);
+  }
+
+  private String getPackageList() {
+    String pkgFormatString = "{\"type\":\"%s\",\"name\":\"%s\"}";
+    String pkgListFormatString = "[%s]";
+    List<String> packages = new ArrayList();
+    Application application = getMetainfo().getApplication();
+    if (application != null) {
+      List<OSSpecific> osSpecifics = application.getOSSpecifics();
+      if (osSpecifics != null && osSpecifics.size() > 0) {
+        for (OSSpecific osSpecific : osSpecifics) {
+          if (osSpecific.getOsType().equals("any")) {
+            for (OSPackage osPackage : osSpecific.getPackages()) {
+              packages.add(String.format(pkgFormatString, osPackage.getType(), osPackage.getName()));
+            }
+          }
+        }
+      }
+    }
+
+    if (packages.size() > 0) {
+      return String.format(pkgListFormatString, StringUtils.join(",", packages));
+    } else {
+      return "[]";
+    }
   }
 
   private void prepareExecutionCommand(ExecutionCommand cmd) {
@@ -781,9 +953,9 @@ public class AgentProviderService extends AbstractProviderService implements
     return cmdParams;
   }
 
-  private void setInstallCommandConfigurations(ExecutionCommand cmd) throws SliderException {
+  private void setInstallCommandConfigurations(ExecutionCommand cmd, String containerId) throws SliderException {
     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
-    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf);
+    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId);
     cmd.setConfigurations(configurations);
   }
 
@@ -810,7 +982,7 @@ public class AgentProviderService extends AbstractProviderService implements
 
     cmd.setCommandParams(setCommandParameters(scriptPath, false));
 
-    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf);
+    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId);
 
     cmd.setConfigurations(configurations);
 
@@ -865,17 +1037,34 @@ public class AgentProviderService extends AbstractProviderService implements
 
     cmd.setCommandParams(setCommandParameters(scriptPath, true));
 
-    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf);
+    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId);
 
     cmd.setConfigurations(configurations);
     response.addExecutionCommand(cmd);
   }
 
   protected Map<String, String> getAllocatedPorts() {
-    return this.allocatedPorts;
+    return getAllocatedPorts(SHARED_PORT_TAG);
   }
 
-  private Map<String, Map<String, String>> buildCommandConfigurations(ConfTreeOperations appConf)
+  protected Map<String, Map<String, String>> getComponentInstanceData() {
+    return this.componentInstanceData;
+  }
+
+  protected Map<String, String> getAllocatedPorts(String containerId) {
+    if (!this.allocatedPorts.containsKey(containerId)) {
+      synchronized (this.allocatedPorts) {
+        if (!this.allocatedPorts.containsKey(containerId)) {
+          this.allocatedPorts.put(containerId,
+              new ConcurrentHashMap<String, String>());
+        }
+      }
+    }
+    return this.allocatedPorts.get(containerId);
+  }
+
+  private Map<String, Map<String, String>> buildCommandConfigurations(
+      ConfTreeOperations appConf, String containerId)
       throws SliderException {
 
     Map<String, Map<String, String>> configurations = new TreeMap<>();
@@ -886,7 +1075,7 @@ public class AgentProviderService extends AbstractProviderService implements
     //Add global
     for (String configType : configs) {
       addNamedConfiguration(configType, appConf.getGlobalOptions().options,
-                            configurations, tokens);
+                            configurations, tokens, containerId);
     }
 
     return configurations;
@@ -898,6 +1087,7 @@ public class AgentProviderService extends AbstractProviderService implements
     tokens.put("${NN_URI}", nnuri);
     tokens.put("${NN_HOST}", URI.create(nnuri).getHost());
     tokens.put("${ZK_HOST}", appConf.get(OptionKeys.ZOOKEEPER_HOSTS));
+    tokens.put("${DEF_ZK_PATH}", appConf.get(OptionKeys.ZOOKEEPER_PATH));
     tokens.put("${DEFAULT_DATA_DIR}", getAmState()
         .getInternalsSnapshot()
         .getGlobalOptions()
@@ -912,9 +1102,10 @@ public class AgentProviderService extends AbstractProviderService implements
     configList.add(GLOBAL_CONFIG_TAG);
 
     String configTypes = appConf.get("config_types");
-    String[] configs = configTypes.split(",");
-
-    configList.addAll(Arrays.asList(configs));
+    if (configTypes != null && configTypes.length() > 0) {
+      String[] configs = configTypes.split(",");
+      configList.addAll(Arrays.asList(configs));
+    }
 
     // remove duplicates.  mostly worried about 'global' being listed
     return new ArrayList<>(new HashSet<>(configList));
@@ -922,7 +1113,7 @@ public class AgentProviderService extends AbstractProviderService implements
 
   private void addNamedConfiguration(String configName, Map<String, String> sourceConfig,
                                      Map<String, Map<String, String>> configurations,
-                                     Map<String, String> tokens) {
+                                     Map<String, String> tokens, String containerId) {
     Map<String, String> config = new HashMap<>();
     if (configName.equals(GLOBAL_CONFIG_TAG)) {
       addDefaultGlobalConfig(config);
@@ -934,8 +1125,18 @@ public class AgentProviderService extends AbstractProviderService implements
     //apply any port updates
     if (!this.getAllocatedPorts().isEmpty()) {
       for (String key : config.keySet()) {
-        if (this.getAllocatedPorts().containsKey(key)) {
-          config.put(key, getAllocatedPorts().get(key));
+        String value = config.get(key);
+        String lookupKey = configName + "." + key;
+        if(!value.contains(DO_NOT_PROPAGATE_TAG)) {
+          // If the config property is shared then pass on the already allocated value
+          // from any container
+          if (this.getAllocatedPorts().containsKey(lookupKey)) {
+            config.put(key, getAllocatedPorts().get(lookupKey));
+          }
+        } else {
+          if (this.getAllocatedPorts(containerId).containsKey(lookupKey)) {
+            config.put(key, getAllocatedPorts(containerId).get(lookupKey));
+          }
         }
       }
     }
@@ -966,13 +1167,6 @@ public class AgentProviderService extends AbstractProviderService implements
     config.put("app_install_dir", "${AGENT_WORK_ROOT}/app/install");
   }
 
-  @Override
-  public Map<String, String> buildMonitorDetails(ClusterDescription clusterDesc) {
-    Map<String, String> details = super.buildMonitorDetails(clusterDesc);
-    buildRoleHostDetails(details);
-    return details;
-  }
-
   private void buildRoleHostDetails(Map<String, String> details) {
     for (Map.Entry<String, Map<String, ClusterNode>> entry :
         getRoleClusterNodeMapping().entrySet()) {
@@ -980,22 +1174,5 @@ public class AgentProviderService extends AbstractProviderService implements
                   getHostsList(entry.getValue().values(), false),
                   "");
     }
-  }
-
-  @Override
-  public void applyInitialRegistryDefinitions(URL amWebAPI,
-                                              ServiceInstanceData instanceData) throws IOException {
-    super.applyInitialRegistryDefinitions(amWebAPI, instanceData);
-
-    try {
-      instanceData.internalView.endpoints.put(
-          CustomRegistryConstants.AGENT_REST_API,
-          new RegisteredEndpoint(
-              new URL(amWebAPI, SLIDER_PATH_AGENTS),
-              "Agent REST API"));
-    } catch (URISyntaxException e) {
-      throw new IOException(e);
-    }
-
   }
 }

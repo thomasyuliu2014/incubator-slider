@@ -26,9 +26,23 @@ public interface HBaseKeys {
   
   String ROLE_MASTER = MASTER;
 
+  String ROLE_REST_GATEWAY = "REST";
+  
+  String ROLE_THRIFT_GATEWAY = "THRIFT";
+  
+  String ROLE_THRIFT2_GATEWAY = "THRIFT2";
+  
   /** {@value */
   String REGION_SERVER = "regionserver";
 
+  /** {@value */
+  String REST_GATEWAY = "rest";
+
+  /** {@value */
+  String THRIFT_GATEWAY = "thrift";
+  /** {@value */
+  String THRIFT2_GATEWAY = "thrift2";
+  /**
   /**
    * What is the command for hbase to print a version: {@value}
    */

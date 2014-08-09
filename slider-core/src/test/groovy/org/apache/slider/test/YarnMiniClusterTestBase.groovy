@@ -136,13 +136,8 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
     }
   } 
 
-
-  @Rule
-  public TestName methodName = new TestName();
-
-  @Before
-  public void nameThread() {
-    Thread.currentThread().setName("JUnit");
+  protected String buildClustername(String clustername) {
+    return clustername ?: createClusterName()
   }
 
   /**
@@ -152,7 +147,7 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
    */
   protected String createClusterName() {
     def base = methodName.getMethodName().toLowerCase(Locale.ENGLISH)
-    if (clusterCount++>1) {
+    if (clusterCount++ > 1) {
       base += "-$clusterCount"
     }
     return base
@@ -162,7 +157,7 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
   @Override
   void setup() {
     super.setup()
-    def testConf = getTestConfiguration();
+    def testConf = testConfiguration;
     thawWaitTime = getTimeOptionMillis(testConf,
         KEY_TEST_THAW_WAIT_TIME,
         thawWaitTime)
@@ -183,7 +178,7 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
         hbaseLaunchWaitTime)
 
     accumuloTestsEnabled =
-        testConf.getBoolean(KEY_TEST_ACCUMULO_ENABLED, hbaseTestsEnabled)
+        testConf.getBoolean(KEY_TEST_ACCUMULO_ENABLED, accumuloTestsEnabled)
     accumuloLaunchWaitTime = getTimeOptionMillis(testConf,
         KEY_ACCUMULO_LAUNCH_TIME,
         accumuloLaunchWaitTime)
@@ -230,15 +225,16 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
 
   /**
    * Create and start a minicluster
-   * @param name cluster/test name
+   * @param name cluster/test name; if empty one is created from the junit method
    * @param conf configuration to use
    * @param noOfNodeManagers #of NMs
    * @param numLocalDirs #of local dirs
    * @param numLogDirs #of log dirs
    * @param startZK create a ZK micro cluster
    * @param startHDFS create an HDFS mini cluster
+   * @return the name of the cluster
    */
-  protected void createMiniCluster(String name,
+  protected String createMiniCluster(String name,
                                    YarnConfiguration conf,
                                    int noOfNodeManagers,
                                    int numLocalDirs,
@@ -247,12 +243,14 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 64);
     conf.set(YarnConfiguration.RM_SCHEDULER, FIFO_SCHEDULER);
     SliderUtils.patchConfiguration(conf)
+    name = buildClustername(name)
     miniCluster = new MiniYARNCluster(name, noOfNodeManagers, numLocalDirs, numLogDirs)
     miniCluster.init(conf)
     miniCluster.start();
     if (startHDFS) {
       createMiniHDFSCluster(name, conf)
     }
+    return name
   }
 
   /**
@@ -441,12 +439,16 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
    * @param clusterOps map of key=value cluster options to set with the --option arg
    * @return launcher which will have executed the command.
    */
-  public ServiceLauncher<SliderClient> createOrBuildCluster(String action, String clustername, Map<String, Integer> roles, List<String> extraArgs, boolean deleteExistingData, boolean blockUntilRunning, Map<String, String> clusterOps) {
+  public ServiceLauncher<SliderClient> createOrBuildCluster(String action, String clustername,
+    Map<String, Integer> roles, List<String> extraArgs, boolean deleteExistingData,
+    boolean blockUntilRunning, Map<String, String> clusterOps) {
     assert clustername != null
     assert miniCluster != null
-    if (deleteExistingData) {
-      HadoopFS dfs = HadoopFS.get(new URI(fsDefaultName), miniCluster.config)
-      Path clusterDir = new SliderFileSystem(dfs, miniCluster.config).buildClusterDirPath(clustername)
+    // update action should keep existing data
+    def config = miniCluster.config
+    if (deleteExistingData && !SliderActions.ACTION_UPDATE.equals(action)) {
+      HadoopFS dfs = HadoopFS.get(new URI(fsDefaultName), config)
+      Path clusterDir = new SliderFileSystem(dfs, config).buildClusterDirPath(clustername)
       log.info("deleting customer data at $clusterDir")
       //this is a safety check to stop us doing something stupid like deleting /
       assert clusterDir.toString().contains("/.slider/")
@@ -485,7 +487,7 @@ public abstract class YarnMiniClusterTestBase extends ServiceLauncherBaseTest {
     }
     ServiceLauncher<SliderClient> launcher = launchClientAgainstMiniMR(
         //config includes RM binding info
-        new YarnConfiguration(miniCluster.config),
+        new YarnConfiguration(config),
         //varargs list of command line params
         argsList
     )

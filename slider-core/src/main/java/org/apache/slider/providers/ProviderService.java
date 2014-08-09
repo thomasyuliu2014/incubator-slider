@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.slider.api.ClusterDescription;
 import org.apache.slider.common.tools.SliderFileSystem;
 import org.apache.slider.core.conf.AggregateConf;
@@ -31,19 +32,23 @@ import org.apache.slider.core.exceptions.SliderException;
 import org.apache.slider.core.launch.ContainerLauncher;
 import org.apache.slider.core.main.ExitCodeProvider;
 import org.apache.slider.core.registry.info.ServiceInstanceData;
-import org.apache.slider.server.appmaster.AMViewForProviders;
+import org.apache.slider.server.appmaster.actions.QueueAccess;
+import org.apache.slider.server.appmaster.state.ContainerReleaseSelector;
+import org.apache.slider.server.appmaster.operations.RMOperationHandlerActions;
 import org.apache.slider.server.appmaster.state.StateAccessForProviders;
 import org.apache.slider.server.appmaster.web.rest.agent.AgentRestOperations;
 import org.apache.slider.server.services.registry.RegistryViewForProviders;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 
-public interface ProviderService extends ProviderCore, Service,
-                                         ExitCodeProvider {
+public interface ProviderService extends ProviderCore,
+    Service,
+    RMOperationHandlerActions,
+    ExitCodeProvider {
 
   /**
    * Set up the entire container launch context
@@ -67,6 +72,12 @@ public interface ProviderService extends ProviderCore, Service,
       Path containerTmpDirPath) throws
       IOException,
       SliderException;
+
+  /**
+   * Notify the providers of container completion
+   * @param containerId container that has completed
+   */
+  void notifyContainerCompleted(ContainerId containerId);
 
   /**
    * Execute a process in the AM
@@ -135,15 +146,10 @@ public interface ProviderService extends ProviderCore, Service,
    */
   Map<String, String> buildMonitorDetails(ClusterDescription clusterSpec);
 
-  /**
-   * bind operation -invoked before the service is started
-   * @param stateAccessor interface offering read access to the state
-   * @param registry
-   * @param amView
-   */
-  void bind(StateAccessForProviders stateAccessor,
-            RegistryViewForProviders registry,
-            AMViewForProviders amView);
+  public void bind(StateAccessForProviders stateAccessor,
+      RegistryViewForProviders reg,
+      QueueAccess queueAccess,
+      List<Container> liveContainers);
 
   /**
    * Returns the agent rest operations interface.
@@ -159,10 +165,19 @@ public interface ProviderService extends ProviderCore, Service,
 
   /**
    * Prior to going live -register the initial service registry data
-   * @param amWebAPI
+   * @param unsecureWebAPI
+   * @param secureWebAPI
    * @param registryInstanceData
    */
-  void applyInitialRegistryDefinitions(URL amWebAPI,
-      ServiceInstanceData registryInstanceData) throws MalformedURLException,
-      IOException;
+  void applyInitialRegistryDefinitions(URL unsecureWebAPI,
+                                       URL secureWebAPI,
+                                       ServiceInstanceData registryInstanceData)
+      throws IOException;
+
+  /**
+   * Create the container release selector for this provider...any policy
+   * can be implemented
+   * @return the selector to use for choosing containers.
+   */
+  ContainerReleaseSelector createContainerReleaseSelector();
 }

@@ -42,10 +42,9 @@ class TestTwoLiveClusters extends HBaseMiniClusterTestBase {
    */
   @Test
   public void testTwoLiveClusters() throws Throwable {
-    def name = "test_two_live_clusters"
-    createMiniCluster(name, configuration, 1, true)
+    String clustername = createMiniCluster("", configuration, 1, true)
 
-    String clustername1 = name + "-1"
+    String clustername1 = clustername + "-1"
     //now launch the cluster
     int regionServerCount = 1
     ServiceLauncher<SliderClient> launcher = createHBaseCluster(clustername1, regionServerCount, [], true, true) 
@@ -62,7 +61,7 @@ class TestTwoLiveClusters extends HBaseMiniClusterTestBase {
     waitForHBaseRegionServerCount(sliderClient, clustername1, 1, hbaseClusterStartupToLiveTime)
 
     //now here comes cluster #2
-    String clustername2 = name + "-2"
+    String clustername2 = clustername + "-2"
 
 
     String zkpath = "/$clustername2"
@@ -88,7 +87,7 @@ class TestTwoLiveClusters extends HBaseMiniClusterTestBase {
     def names = registry.getServiceTypes();
     dumpRegistryServiceTypes(names)
 
-    List<String> instanceIds = sliderClient.listRegistedSliderInstances()
+    List<String> instanceIds = sliderClient.listRegisteredSliderInstances()
 
 
     dumpRegistryInstanceIDs(instanceIds)

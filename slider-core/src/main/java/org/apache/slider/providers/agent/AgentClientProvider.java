@@ -18,6 +18,7 @@
 
 package org.apache.slider.providers.agent;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.slider.api.OptionKeys;
@@ -91,10 +92,18 @@ public class AgentClientProvider extends AbstractClientProvider
         getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
     Path appDefPath = new Path(appDef);
     sliderFileSystem.verifyFileExists(appDefPath);
+    
+    String pkgList = instanceDefinition.getAppConfOperations().
+        getGlobalOptions().getOption(AgentKeys.PACKAGE_LIST, null);
+    if (pkgList != null) {
+      sliderFileSystem.verifyFileExistsInZip(appDefPath, pkgList);
+    }
 
     String agentConf = instanceDefinition.getAppConfOperations().
-        getGlobalOptions().getMandatoryOption(AgentKeys.AGENT_CONF);
-    sliderFileSystem.verifyFileExists(new Path(agentConf));
+        getGlobalOptions().getOption(AgentKeys.AGENT_CONF, "");
+    if (StringUtils.isNotEmpty(agentConf)) {
+      sliderFileSystem.verifyFileExists(new Path(agentConf));
+    }
 
     String appHome = instanceDefinition.getAppConfOperations().
         getGlobalOptions().get(AgentKeys.PACKAGE_PATH);
@@ -172,15 +181,6 @@ public class AgentClientProvider extends AbstractClientProvider
                                    AgentKeys.PACKAGE_PATH + " or image root " +
                                    OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH
                                    + " must be provided.");
-    }
-
-    try {
-      // Validate the agent config
-      instanceDefinition.getAppConfOperations().
-          getGlobalOptions().getMandatoryOption(AgentKeys.AGENT_CONF);
-    } catch (BadConfigException bce) {
-      throw new BadConfigException("Agent config "+ AgentKeys.AGENT_CONF 
-                                   + " property must be provided.");
     }
   }
 

@@ -20,6 +20,9 @@ package org.apache.slider.providers;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.slider.api.ClusterDescription;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.common.tools.ConfigHelper;
@@ -30,7 +33,9 @@ import org.apache.slider.core.exceptions.SliderException;
 import org.apache.slider.core.main.ExitCodeProvider;
 import org.apache.slider.core.registry.info.RegisteredEndpoint;
 import org.apache.slider.core.registry.info.ServiceInstanceData;
-import org.apache.slider.server.appmaster.AMViewForProviders;
+import org.apache.slider.server.appmaster.actions.QueueAccess;
+import org.apache.slider.server.appmaster.state.ContainerReleaseSelector;
+import org.apache.slider.server.appmaster.state.MostRecentContainerReleaseSelector;
 import org.apache.slider.server.appmaster.state.StateAccessForProviders;
 import org.apache.slider.server.appmaster.web.rest.agent.AgentRestOperations;
 import org.apache.slider.server.services.registry.RegistryViewForProviders;
@@ -42,7 +47,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collection;
 import java.util.HashMap;
@@ -67,8 +71,8 @@ public abstract class AbstractProviderService
   protected AgentRestOperations restOps;
   protected RegistryViewForProviders registry;
   protected ServiceInstanceData registryInstanceData;
-  protected AMViewForProviders amView;
   protected URL amWebAPI;
+  protected QueueAccess queueAccess;
 
   public AbstractProviderService(String name) {
     super(name);
@@ -83,8 +87,8 @@ public abstract class AbstractProviderService
     return amState;
   }
 
-  public AMViewForProviders getAppMaster() {
-    return amView;
+  public QueueAccess getQueueAccess() {
+    return queueAccess;
   }
 
   public void setAmState(StateAccessForProviders amState) {
@@ -93,15 +97,21 @@ public abstract class AbstractProviderService
 
   @Override
   public void bind(StateAccessForProviders stateAccessor,
-      RegistryViewForProviders reg, AMViewForProviders amView) {
+      RegistryViewForProviders reg,
+      QueueAccess queueAccess,
+      List<Container> liveContainers) {
     this.amState = stateAccessor;
     this.registry = reg;
-    this.amView = amView;
+    this.queueAccess = queueAccess;
   }
 
   @Override
   public AgentRestOperations getAgentRestOperations() {
     return restOps;
+  }
+
+  @Override
+  public void notifyContainerCompleted(ContainerId containerId) {
   }
 
   public void setAgentRestOperations(AgentRestOperations agentRestOperations) {
@@ -312,11 +322,32 @@ public abstract class AbstractProviderService
     }
   }
   @Override
-  public void applyInitialRegistryDefinitions(URL amWebAPI,
-      ServiceInstanceData registryInstanceData) throws MalformedURLException,
-      IOException {
+  public void applyInitialRegistryDefinitions(URL unsecureWebAPI,
+      URL secureWebAPI,
+      ServiceInstanceData registryInstanceData) throws IOException {
 
-      this.amWebAPI = amWebAPI;
+      this.amWebAPI = unsecureWebAPI;
     this.registryInstanceData = registryInstanceData;
+  }
+
+  /**
+   * {@inheritDoc}
+   * 
+   * 
+   * @return The base implementation returns the most recent containers first.
+   */
+  @Override
+  public ContainerReleaseSelector createContainerReleaseSelector() {
+    return new MostRecentContainerReleaseSelector();
+  }
+
+  @Override
+  public void releaseAssignedContainer(ContainerId containerId) {
+    // no-op
+  }
+
+  @Override
+  public void addContainerRequest(AMRMClient.ContainerRequest req) {
+    // no-op
   }
 }
