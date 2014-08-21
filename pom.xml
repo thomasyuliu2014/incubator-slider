@@ -19,7 +19,7 @@
   <groupId>org.apache.slider</groupId>
   <artifactId>slider</artifactId>
   <name>Slider</name>
-  <version>0.41.0-incubating-SNAPSHOT</version>
+  <version>0.51.0-incubating-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <description>
@@ -45,7 +45,6 @@
     <module>slider-providers/hbase/hbase-funtests</module>
     <module>slider-providers/accumulo/slider-accumulo-provider</module>
     <module>slider-providers/accumulo/accumulo-funtests</module>
-    <module>slider-install</module>
   </modules>
 
   <licenses>
@@ -94,11 +93,13 @@
 
   <properties>
 
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <!-- 
     Java versions
     -->
-    <project.java.src.version>1.7</project.java.src.version>
+    <project.java.src.version>1.6</project.java.src.version>
     <enforced.java.version>${project.java.src.version}</enforced.java.version>
     <groovy.version>2.2.2</groovy.version>
     
@@ -143,11 +144,16 @@
 
     <jackson.version>1.9.13</jackson.version>
     <jcommander.version>1.30</jcommander.version>
+
+    <jetty.version>6.1.26</jetty.version>
     <jersey.version>1.9</jersey.version>
     <servlet-api.version>2.5</servlet-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
+    <jaxb-api.version>2.2.7</jaxb-api.version>
+
     <junit.version>4.11</junit.version>
     <log4j.version>1.2.17</log4j.version>
+    <metrics.version>3.0.1</metrics.version>
     <mockito.version>1.8.5</mockito.version>
 
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
@@ -225,8 +231,8 @@
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
             <compilerId>groovy-eclipse-compiler</compilerId>
-            <source>1.7</source>
-            <target>1.7</target>
+            <source>${project.java.src.version}</source>
+            <target>${project.java.src.version}</target>
             <!-- set verbose to be true if you want lots of uninteresting messages -->
             <!-- <verbose>true</verbose> -->
           </configuration>
@@ -246,7 +252,7 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[1.7,)</version>
+                  <version>[${project.java.src.version},)</version>
                 </requireJavaVersion>
               </rules>
             </configuration>
@@ -337,7 +343,6 @@
             <exclude>**/dfs.exclude</exclude>
             <exclude>**/*.iml</exclude>
             <exclude>**/rat.txt</exclude>
-            <exclude>**/get-hbase-site.sh</exclude>
             <exclude>DISCLAIMER</exclude>
             <exclude>app-packages/hbase/target/**</exclude>
           </excludes>
@@ -1115,6 +1120,12 @@
       </dependency>
 
       <dependency>
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>${jaxb-api.version}</version>
+      </dependency>
+
+      <dependency>
         <groupId>com.sun.jersey</groupId>
         <artifactId>jersey-client</artifactId>
         <version>${jersey.version}</version>
@@ -1174,6 +1185,11 @@
         <version>${jersey.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>com.codahale.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${metrics.version}</version>
+      </dependency>
 
       <!-- ======================================================== -->
       <!-- Mocking -->
@@ -1196,9 +1212,19 @@
       <!-- ======================================================== -->
 
       <dependency>
-	      <groupId>org.mortbay.jetty</groupId>
-	      <artifactId>jetty-sslengine</artifactId>
-        <version>6.1.26</version>
+        <groupId>org.mortbay.jetty</groupId>
+        <artifactId>jetty</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mortbay.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mortbay.jetty</groupId>
+        <artifactId>jetty-sslengine</artifactId>
+        <version>${jetty.version}</version>
       </dependency>
 
     </dependencies>

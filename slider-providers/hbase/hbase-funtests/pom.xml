@@ -27,7 +27,7 @@
   <parent>
     <groupId>org.apache.slider</groupId>
     <artifactId>slider</artifactId>
-    <version>0.41.0-incubating-SNAPSHOT</version>
+    <version>0.51.0-incubating-SNAPSHOT</version>
     <relativePath>../../../</relativePath>
   </parent>
 
@@ -135,6 +135,11 @@
       <artifactId>slider-hbase-provider</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.slider</groupId>
+      <artifactId>slider-core</artifactId>
     </dependency>
 
     <dependency>

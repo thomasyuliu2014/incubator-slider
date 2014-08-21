@@ -34,6 +34,7 @@ from Heartbeat import Heartbeat
 from Register import Register
 from ActionQueue import ActionQueue
 from NetUtil import NetUtil
+from Registry import Registry
 import ssl
 import ProcessHelper
 import Constants
@@ -43,7 +44,12 @@ import security
 logger = logging.getLogger()
 
 AGENT_AUTO_RESTART_EXIT_CODE = 77
+HEART_BEAT_RETRY_THRESHOLD = 2
 
+WS_AGENT_CONTEXT_ROOT = '/ws'
+SLIDER_PATH_AGENTS = WS_AGENT_CONTEXT_ROOT + '/v1/slider/agents/'
+SLIDER_REL_PATH_REGISTER = '/register'
+SLIDER_REL_PATH_HEARTBEAT = '/heartbeat'
 
 class State:
   INIT, INSTALLING, INSTALLED, STARTING, STARTED, FAILED = range(6)
@@ -57,13 +63,12 @@ class Controller(threading.Thread):
     self.safeMode = True
     self.credential = None
     self.config = config
-    self.hostname = config.getLabel()
-    server_url = 'https://' + config.get(AgentConfig.SERVER_SECTION,
-                                        'hostname') + \
-                 ':' + config.get(AgentConfig.SERVER_SECTION,
-                                  'secured_port')
-    self.registerUrl = server_url + '/ws/v1/slider/agents/' + self.hostname + '/register'
-    self.heartbeatUrl = server_url + '/ws/v1/slider/agents/' + self.hostname + '/heartbeat'
+    self.label = config.getLabel()
+    self.hostname = config.get(AgentConfig.SERVER_SECTION, 'hostname')
+    self.secured_port = config.get(AgentConfig.SERVER_SECTION, 'secured_port')
+    self.server_url = 'https://' + self.hostname + ':' + self.secured_port
+    self.registerUrl = self.server_url + SLIDER_PATH_AGENTS + self.label + SLIDER_REL_PATH_REGISTER
+    self.heartbeatUrl = self.server_url + SLIDER_PATH_AGENTS + self.label + SLIDER_REL_PATH_HEARTBEAT
     self.netutil = NetUtil()
     self.responseId = -1
     self.repeatRegistration = False
@@ -80,6 +85,8 @@ class Controller(threading.Thread):
     self.componentActualState = State.INIT
     self.statusCommand = None
     self.failureCount = 0
+    self.heartBeatRetryCount = 0
+    self.autoRestart = False
 
 
   def __del__(self):
@@ -111,7 +118,11 @@ class Controller(threading.Thread):
 
     while not self.isRegistered:
       try:
-        data = json.dumps(self.register.build(id))
+        data = json.dumps(self.register.build(
+          self.componentActualState,
+          self.componentExpectedState,
+          self.actionQueue.customServiceOrchestrator.allocated_ports,
+          id))
         logger.info("Registering with the server at " + self.registerUrl +
                     " with data " + pprint.pformat(data))
         response = self.sendRequest(self.registerUrl, data)
@@ -204,8 +215,8 @@ class Controller(threading.Thread):
       try:
         if not retry:
           data = json.dumps(
-            self.heartbeat.build(commandResult, self.responseId,
-                                 self.hasMappedComponents))
+            self.heartbeat.build(commandResult,
+                                 self.responseId, self.hasMappedComponents))
           self.updateStateBasedOnResult(commandResult)
           logger.debug("Sending request: " + data)
           pass
@@ -217,6 +228,12 @@ class Controller(threading.Thread):
         logger.debug('Got server response: ' + pprint.pformat(response))
 
         serverId = int(response['responseId'])
+
+        restartEnabled = False
+        if 'restartEnabled' in response:
+          restartEnabled = response['restartEnabled']
+          if restartEnabled:
+            logger.info("Component auto-restart is enabled.")
 
         if 'hasMappedComponents' in response.keys():
           self.hasMappedComponents = response['hasMappedComponents'] != False
@@ -231,7 +248,8 @@ class Controller(threading.Thread):
             return
 
         if serverId != self.responseId + 1:
-          logger.error("Error in responseId sequence - restarting")
+          logger.error("Error in responseId sequence expected " + str(self.responseId + 1)
+                       + " but got " + str(serverId) + " - restarting")
           self.restartAgent()
         else:
           self.responseId = serverId
@@ -248,6 +266,19 @@ class Controller(threading.Thread):
           self.restartAgent()
         else:
           logger.info("No commands sent from the Server.")
+          pass
+
+        # Add a start command
+        if self.componentActualState == State.FAILED and \
+                self.componentExpectedState == State.STARTED and restartEnabled:
+          stored_command = self.actionQueue.customServiceOrchestrator.stored_command
+          if len(stored_command) > 0:
+            auto_start_command = self.create_start_command(stored_command)
+            if auto_start_command:
+              logger.info("Automatically adding a start command.")
+              logger.debug("Auto start command: " + pprint.pformat(auto_start_command))
+              self.updateStateBasedOnCommand([auto_start_command], False)
+              self.addToQueue([auto_start_command])
           pass
 
         # Add a status command
@@ -285,9 +316,33 @@ class Controller(threading.Thread):
             print(
               "Server certificate verify failed. Did you regenerate server certificate?")
             certVerifFailed = True
+        self.heartBeatRetryCount += 1
+        logger.error(
+          "Heartbeat retry count = %d" % (self.heartBeatRetryCount))
+        # Re-read zk registry in case AM was restarted and came up with new 
+        # host/port, but do this only after heartbeat retry attempts crosses
+        # threshold
+        if self.heartBeatRetryCount > HEART_BEAT_RETRY_THRESHOLD:
+          self.isRegistered = False
+          self.repeatRegistration = True
+          self.heartBeatRetryCount = 0
+          self.cachedconnect = None # Previous connection is broken now
+          zk_quorum = self.config.get(AgentConfig.SERVER_SECTION, Constants.ZK_QUORUM)
+          zk_reg_path = self.config.get(AgentConfig.SERVER_SECTION, Constants.ZK_REG_PATH)
+          registry = Registry(zk_quorum, zk_reg_path)
+          amHost, amUnsecuredPort, amSecuredPort = registry.readAMHostPort()
+          logger.info("Read from ZK registry: AM host = %s, AM secured port = %s" % (amHost, amSecuredPort))
+          self.hostname = amHost
+          self.secured_port = amSecuredPort
+          self.config.set(AgentConfig.SERVER_SECTION, "hostname", self.hostname)
+          self.config.set(AgentConfig.SERVER_SECTION, "secured_port", self.secured_port)
+          self.server_url = 'https://' + self.hostname + ':' + self.secured_port
+          self.registerUrl = self.server_url + SLIDER_PATH_AGENTS + self.label + SLIDER_REL_PATH_REGISTER
+          self.heartbeatUrl = self.server_url + SLIDER_PATH_AGENTS + self.label + SLIDER_REL_PATH_HEARTBEAT
+          return
         self.cachedconnect = None # Previous connection is broken now
         retry = True
-        # Sleep for some time
+      # Sleep for some time
       timeout = self.netutil.HEARTBEAT_IDDLE_INTERVAL_SEC \
                 - self.netutil.MINIMUM_INTERVAL_BETWEEN_HEARTBEATS
       self.heartbeat_wait_event.wait(timeout=timeout)
@@ -297,13 +352,25 @@ class Controller(threading.Thread):
     pass
     logger.info("Controller stopped heart-beating.")
 
-  def updateStateBasedOnCommand(self, commands):
+
+  def create_start_command(self, stored_command):
+    taskId = int(stored_command['taskId'])
+    taskId = taskId + 1
+    stored_command['taskId'] = taskId
+    stored_command['commandId'] = "{0}-1".format(taskId)
+    stored_command[Constants.AUTO_GENERATED] = True
+    return stored_command
+    pass
+
+
+  def updateStateBasedOnCommand(self, commands, createStatus=True):
     for command in commands:
       if command["roleCommand"] == "START":
         self.componentExpectedState = State.STARTED
         self.componentActualState = State.STARTING
         self.failureCount = 0
-        self.statusCommand = self.createStatusCommand(command)
+        if createStatus:
+          self.statusCommand = self.createStatusCommand(command)
 
       if command["roleCommand"] == "INSTALL":
         self.componentExpectedState = State.INSTALLED
@@ -329,6 +396,7 @@ class Controller(threading.Thread):
 
       if "healthStatus" in commandResult:
         if commandResult["healthStatus"] == "INSTALLED":
+          # Mark it FAILED as its a failure remedied by auto-start or container restart
           self.componentActualState = State.FAILED
           self.failureCount += 1
           self.logStates()
@@ -357,9 +425,9 @@ class Controller(threading.Thread):
     statusCommand["hostLevelParams"] = command["hostLevelParams"]
     statusCommand["serviceName"] = command["serviceName"]
     statusCommand["taskId"] = "status"
-    statusCommand['auto_generated'] = True
-    return statusCommand
+    statusCommand[Constants.AUTO_GENERATED] = True
     logger.info("Status command: " + pprint.pformat(statusCommand))
+    return statusCommand
     pass
 
 

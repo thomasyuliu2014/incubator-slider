@@ -18,6 +18,7 @@
 
 package org.apache.slider.common.tools;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.output.ByteArrayOutputStream;
@@ -42,7 +43,7 @@ import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.slider.api.OptionKeys;
+import org.apache.slider.api.InternalKeys;
 import org.apache.slider.api.RoleKeys;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.common.SliderXmlConfKeys;
@@ -439,7 +440,7 @@ public final class SliderUtils {
    * @return a stringified list
    */
   public static List<String> collectionToStringList(Collection c) {
-    List<String> l = new ArrayList<>(c.size());
+    List<String> l = new ArrayList<String>(c.size());
     for (Object o : c) {
       l.add(o.toString());
     }
@@ -467,13 +468,19 @@ public final class SliderUtils {
    */
   public static String join(Collection collection, String separator, boolean trailing) {
     StringBuilder b = new StringBuilder();
+    // fast return on empty collection
+    if (collection.isEmpty()) {
+      return trailing ? separator : "";
+    }
     for (Object o : collection) {
       b.append(o);
       b.append(separator);
     }
-    return trailing? 
-           b.toString()
-           : (b.substring(0, b.length() - separator.length()));
+    int length = separator.length();
+    String s = b.toString();
+    return (trailing || s.isEmpty())?
+           s
+           : (b.substring(0, b.length() - length));
   }
 
   /**
@@ -610,6 +617,8 @@ public final class SliderUtils {
    */
   public static <T1, T2> Map<T1, T2> mergeMapsIgnoreDuplicateKeys(Map<T1, T2> first,
                                                                   Map<T1, T2> second) {
+    Preconditions.checkArgument(first != null, "Null 'first' value");
+    Preconditions.checkArgument(second != null, "Null 'second' value");
     for (Map.Entry<T1, T2> entry : second.entrySet()) {
       T1 key = entry.getKey();
       if (!first.containsKey(key)) {
@@ -830,7 +839,7 @@ public final class SliderUtils {
    * @return a possibly empty map of environment variables.
    */
   public static Map<String, String> buildEnvMap(Map<String, String> roleOpts) {
-    Map<String, String> env = new HashMap<>();
+    Map<String, String> env = new HashMap<String, String>();
     if (roleOpts != null) {
       for (Map.Entry<String, String> entry: roleOpts.entrySet()) {
         String key = entry.getKey();
@@ -857,7 +866,7 @@ public final class SliderUtils {
       Map<String, String> optionMap = entry.getValue();
       Map<String, String> existingMap = clusterRoleMap.get(key);
       if (existingMap == null) {
-        existingMap = new HashMap<>();
+        existingMap = new HashMap<String, String>();
       }
       log.debug("Overwriting role options with command line values {}",
                 stringifyMap(optionMap));
@@ -1022,7 +1031,7 @@ public final class SliderUtils {
   }
 
     public static Map<String, Map<String, String>> deepClone(Map<String, Map<String, String>> src) {
-    Map<String, Map<String, String>> dest = new HashMap<>();
+    Map<String, Map<String, String>> dest = new HashMap<String, Map<String, String>>();
     for (Map.Entry<String, Map<String, String>> entry : src.entrySet()) {
       dest.put(entry.getKey(), stringMapClone(entry.getValue()));
     }
@@ -1030,7 +1039,7 @@ public final class SliderUtils {
   }
 
   public static Map<String, String> stringMapClone(Map<String, String> src) {
-    Map<String, String> dest =  new HashMap<>();
+    Map<String, String> dest =  new HashMap<String, String>();
     return mergeEntries(dest, src.entrySet());
   }
 
@@ -1294,8 +1303,8 @@ public final class SliderUtils {
       SliderException, IOException {
     Path imagePath;
     String imagePathOption =
-        internalOptions.get(OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH);
-    String appHomeOption = internalOptions.get(OptionKeys.INTERNAL_APPLICATION_HOME);
+        internalOptions.get(InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+    String appHomeOption = internalOptions.get(InternalKeys.INTERNAL_APPLICATION_HOME);
     if (!isUnset(imagePathOption)) {
       imagePath = fs.createPathThatMustExist(imagePathOption);
     } else {
@@ -1467,7 +1476,7 @@ public final class SliderUtils {
           }
           is = new ByteArrayInputStream(content);
         } else {
-          log.info("Size unknown. Reading {}", zipEntry.getName());
+          log.debug("Size unknown. Reading {}", zipEntry.getName());
           ByteArrayOutputStream baos = new ByteArrayOutputStream();
           while (true) {
             int byteRead = zis.read();

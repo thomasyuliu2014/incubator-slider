@@ -22,9 +22,9 @@ package org.apache.slider.providers.hbase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.slider.api.InternalKeys;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.api.ClusterDescription;
-import org.apache.slider.api.OptionKeys;
 import org.apache.slider.api.RoleKeys;
 import org.apache.slider.api.StatusKeys;
 import org.apache.slider.core.conf.AggregateConf;
@@ -68,11 +68,8 @@ import static org.apache.slider.server.appmaster.web.rest.RestPaths.SLIDER_PATH_
  * This class implements the server-side aspects
  * of an HBase Cluster
  */
-public class HBaseProviderService extends AbstractProviderService implements
-                                                                  ProviderCore,
-                                                                  HBaseKeys,
-    SliderKeys,
-    AgentRestOperations{
+public class HBaseProviderService extends AbstractProviderService 
+    implements ProviderCore, HBaseKeys, SliderKeys, AgentRestOperations{
 
   protected static final Logger log =
     LoggerFactory.getLogger(HBaseProviderService.class);
@@ -109,8 +106,8 @@ public class HBaseProviderService extends AbstractProviderService implements
    * @param instanceDefinition the instance definition to validate
    */
   @Override // Client and Server
-  public void validateInstanceDefinition(AggregateConf instanceDefinition) throws
-      SliderException {
+  public void validateInstanceDefinition(AggregateConf instanceDefinition) 
+      throws SliderException {
     clientProvider.validateInstanceDefinition(instanceDefinition);
   }
 
@@ -152,7 +149,7 @@ public class HBaseProviderService extends AbstractProviderService implements
     //Add binaries
     //now add the image if it was set
     String imageURI = instanceDefinition.getInternalOperations()
-                  .get(OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+                  .get(InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
     coreFS.maybeAddImagePath(launcher.getLocalResources(), imageURI);
 
     CommandLineBuilder cli = new CommandLineBuilder();
@@ -180,6 +177,8 @@ public class HBaseProviderService extends AbstractProviderService implements
     String roleCommand;
     String logfile;
     //now look at the role
+
+/* JDK7
     switch (role) {
       case ROLE_WORKER:
         //role is region server
@@ -210,6 +209,33 @@ public class HBaseProviderService extends AbstractProviderService implements
         throw new SliderInternalStateException("Cannot start role %s", role);
     }
 
+*/
+    if (ROLE_WORKER.equals(role)) {
+      //role is region server
+      roleCommand = REGION_SERVER;
+      logfile = "/region-server.txt";
+      
+    } else if (ROLE_MASTER.equals(role)) {
+      roleCommand = MASTER;
+      logfile = "/master.txt";
+
+    } else if (ROLE_REST_GATEWAY.equals(role)) {
+      roleCommand = REST_GATEWAY;
+      logfile = "/rest-gateway.txt";
+
+    } else if (ROLE_THRIFT_GATEWAY.equals(role)) {
+      roleCommand = THRIFT_GATEWAY;
+      logfile = "/thrift-gateway.txt";
+
+    } else if (ROLE_THRIFT2_GATEWAY.equals(role)) {
+      roleCommand = THRIFT2_GATEWAY;
+      logfile = "/thrift2-gateway.txt";
+    }
+    
+    else {
+      throw new SliderInternalStateException("Cannot start role %s", role);
+    }
+    
     cli.add(roleCommand);
     cli.add(ACTION_START);
     //log details
@@ -219,11 +245,15 @@ public class HBaseProviderService extends AbstractProviderService implements
   }
 
   @Override
-  public void applyInitialRegistryDefinitions(URL web,
-                                              URL secureWebAPI,
+  public void applyInitialRegistryDefinitions(URL amWebURI,
+                                              URL agentOpsURI,
+                                              URL agentStatusURI,
                                               ServiceInstanceData instanceData) throws
       IOException {
-    super.applyInitialRegistryDefinitions(web, secureWebAPI, instanceData);
+    super.applyInitialRegistryDefinitions(amWebURI, agentOpsURI,
+                                          agentStatusURI,
+                                          instanceData
+    );
   }
 
   @Override
@@ -319,7 +349,7 @@ public class HBaseProviderService extends AbstractProviderService implements
    * @return the provider status - map of entries to add to the info section
    */
   public Map<String, String> buildProviderStatus() {
-    Map<String, String> stats = new HashMap<>();
+    Map<String, String> stats = new HashMap<String, String>();
 
     return stats;
   }

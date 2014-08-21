@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.slider.api.InternalKeys;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.api.ClusterDescription;
 import org.apache.slider.api.OptionKeys;
@@ -161,7 +162,7 @@ public class AccumuloProviderService extends AbstractProviderService implements
     //Add binaries
     //now add the image if it was set
     String imageURI = instanceDefinition.getInternalOperations()
-                                        .get(OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+                                        .get(InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
     fileSystem.maybeAddImagePath(launcher.getLocalResources(), imageURI);
 
     CommandLineBuilder commandLine = new CommandLineBuilder();
@@ -169,6 +170,8 @@ public class AccumuloProviderService extends AbstractProviderService implements
     String heap = "-Xmx" + appComponent.getOption(RoleKeys.JVM_HEAP, DEFAULT_JVM_HEAP);
     String opt = "ACCUMULO_OTHER_OPTS";
     if (SliderUtils.isSet(heap)) {
+/* JDK7
+
       switch (role) {
         case AccumuloKeys.ROLE_MASTER:
           opt = "ACCUMULO_MASTER_OPTS";
@@ -182,6 +185,16 @@ public class AccumuloProviderService extends AbstractProviderService implements
         case AccumuloKeys.ROLE_GARBAGE_COLLECTOR:
           opt = "ACCUMULO_GC_OPTS";
           break;
+      }
+*/
+      if (AccumuloKeys.ROLE_MASTER.equals(role)) {
+        opt = "ACCUMULO_MASTER_OPTS";
+      } else if (AccumuloKeys.ROLE_TABLET.equals(role)) {
+        opt = "ACCUMULO_TSERVER_OPTS";
+      } else if (AccumuloKeys.ROLE_MONITOR.equals(role)) {
+        opt = "ACCUMULO_MONITOR_OPTS";
+      } else if (AccumuloKeys.ROLE_GARBAGE_COLLECTOR.equals(role)) {
+        opt = "ACCUMULO_GC_OPTS";
       }
       launcher.setEnv(opt, heap);
     }
@@ -238,7 +251,7 @@ public class AccumuloProviderService extends AbstractProviderService implements
 
 
     String accumuloScript = AccumuloClientProvider.buildScriptBinPath(instance);
-    List<String> launchSequence = new ArrayList<>(8);
+    List<String> launchSequence = new ArrayList<String>(8);
     launchSequence.add(0, accumuloScript);
     Collections.addAll(launchSequence, commands);
     return launchSequence;
@@ -333,11 +346,12 @@ public class AccumuloProviderService extends AbstractProviderService implements
     //callback to AM to trigger cluster review is set up to happen after
     //the init/verify action has succeeded
     int delay = internalOperations.getGlobalOptions().getOptionInt(
-        OptionKeys.INTERNAL_CONTAINER_STARTUP_DELAY,
-        OptionKeys.DEFAULT_CONTAINER_STARTUP_DELAY);
+        InternalKeys.INTERNAL_CONTAINER_STARTUP_DELAY,
+        InternalKeys.DEFAULT_INTERNAL_CONTAINER_STARTUP_DELAY);
     ProviderCompletedCallable completedCallable =
         new ProviderCompletedCallable(execInProgress, null);
-    Service notifier = new WorkflowCallbackService<>(
+    // JDK7
+    Service notifier = new WorkflowCallbackService(
         "accumulo notifier",
         completedCallable,
         delay,
@@ -364,7 +378,7 @@ public class AccumuloProviderService extends AbstractProviderService implements
     String dataDir = cd.getInternalOperations()
                                .getGlobalOptions()
                                .getMandatoryOption(
-                                 OptionKeys.INTERNAL_DATA_DIR_PATH);
+                                 InternalKeys.INTERNAL_DATA_DIR_PATH);
     Path accumuloInited = new Path(dataDir, INSTANCE_ID);
     FileSystem fs2 = FileSystem.get(accumuloInited.toUri(), getConf());
     return fs2.exists(accumuloInited);
@@ -388,7 +402,7 @@ public class AccumuloProviderService extends AbstractProviderService implements
   @Override
   public Map<String, String> buildProviderStatus() {
     
-    Map<String,String> status = new HashMap<>();
+    Map<String,String> status = new HashMap<String, String>();
     
     
     return status;

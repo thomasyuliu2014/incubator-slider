@@ -21,7 +21,7 @@ package org.apache.slider.providers.agent;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.slider.api.OptionKeys;
+import org.apache.slider.api.InternalKeys;
 import org.apache.slider.api.ResourceKeys;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.common.tools.SliderFileSystem;
@@ -92,12 +92,6 @@ public class AgentClientProvider extends AbstractClientProvider
         getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
     Path appDefPath = new Path(appDef);
     sliderFileSystem.verifyFileExists(appDefPath);
-    
-    String pkgList = instanceDefinition.getAppConfOperations().
-        getGlobalOptions().getOption(AgentKeys.PACKAGE_LIST, null);
-    if (pkgList != null) {
-      sliderFileSystem.verifyFileExistsInZip(appDefPath, pkgList);
-    }
 
     String agentConf = instanceDefinition.getAppConfOperations().
         getGlobalOptions().getOption(AgentKeys.AGENT_CONF, "");
@@ -109,7 +103,7 @@ public class AgentClientProvider extends AbstractClientProvider
         getGlobalOptions().get(AgentKeys.PACKAGE_PATH);
     if (SliderUtils.isUnset(appHome)) {
       String agentImage = instanceDefinition.getInternalOperations().
-          get(OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+          get(InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
       sliderFileSystem.verifyFileExists(new Path(agentImage));
     }
   }
@@ -174,12 +168,12 @@ public class AgentClientProvider extends AbstractClientProvider
     String appHome = instanceDefinition.getAppConfOperations().
         getGlobalOptions().get(AgentKeys.PACKAGE_PATH);
     String agentImage = instanceDefinition.getInternalOperations().
-        get(OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+        get(InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
 
     if (SliderUtils.isUnset(appHome) && SliderUtils.isUnset(agentImage)) {
       throw new BadConfigException("Either agent package path " +
                                    AgentKeys.PACKAGE_PATH + " or image root " +
-                                   OptionKeys.INTERNAL_APPLICATION_IMAGE_PATH
+                                   InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH
                                    + " must be provided.");
     }
   }
@@ -216,7 +210,7 @@ public class AgentClientProvider extends AbstractClientProvider
     }
 
     Application application = metainfo.getApplication();
-    tags = new HashSet<>();
+    tags = new HashSet<String>();
     tags.add("Name: " + application.getName());
     tags.add("Version: " + application.getVersion());
     tags.add("Description: " + SliderUtils.truncate(application.getComment(), 80));

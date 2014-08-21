@@ -36,7 +36,8 @@ class Heartbeat:
     self.config = config
     self.reports = []
 
-  def build(self, commandResult, id='-1', componentsMapped=False):
+  def build(self, commandResult, id='-1',
+            componentsMapped=False):
     timestamp = int(time.time() * 1000)
     queueResult = self.actionQueue.result()
     logger.info("Queue result: " + pformat(queueResult))
@@ -55,7 +56,15 @@ class Heartbeat:
     if not self.actionQueue.commandQueue.empty():
       commandsInProgress = True
     if len(queueResult) != 0:
-      heartbeat['reports'] = queueResult['reports']
+      heartbeat['reports'] = []
+      for report in queueResult['reports']:
+        if report['reportResult']:
+          del report['reportResult']
+          heartbeat['reports'].append(report)
+        else:
+          # dropping the result but only recording the status
+          commandResult["commandStatus"] = report["status"]
+          pass
       if len(heartbeat['reports']) > 0:
         # There may be IN_PROGRESS tasks
         commandsInProgress = True

@@ -28,12 +28,14 @@ public class Component {
   String publishConfig;
   String minInstanceCount;
   String maxInstanceCount;
+  String autoStartOnFailure;
+  String appExports;
   CommandScript commandScript;
-  List<Export> exports;
+  List<ComponentExport> componentExports;
 
   public Component() {
     publishConfig = Boolean.FALSE.toString();
-    exports = new ArrayList<>();
+    componentExports = new ArrayList<ComponentExport>();
   }
 
   public String getName() {
@@ -60,6 +62,22 @@ public class Component {
     this.publishConfig = publishConfig;
   }
 
+  public String getAutoStartOnFailure() {
+    return autoStartOnFailure;
+  }
+
+  public void setAutoStartOnFailure(String autoStartOnFailure) {
+    this.autoStartOnFailure = autoStartOnFailure;
+  }
+
+  public String getAppExports() {
+    return appExports;
+  }
+
+  public void setAppExports(String appExports) {
+    this.appExports = appExports;
+  }
+
   public String getMinInstanceCount() {
     return minInstanceCount;
   }
@@ -84,12 +102,16 @@ public class Component {
     this.commandScript = commandScript;
   }
 
-  public void addExport(Export export) {
-    exports.add(export);
+  public void addComponentExport(ComponentExport export) {
+    componentExports.add(export);
   }
 
-  public List<Export> getExports() {
-    return exports;
+  public List<ComponentExport> getComponentExports() {
+    return componentExports;
+  }
+
+  public Boolean getRequiresAutoRestart() {
+    return Boolean.parseBoolean(this.autoStartOnFailure);
   }
 
   @Override

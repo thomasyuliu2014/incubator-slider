@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.slider.api.ClusterDescription;
 import org.apache.slider.api.ClusterNode;
+import org.apache.slider.api.InternalKeys;
 import org.apache.slider.api.OptionKeys;
 import org.apache.slider.api.ResourceKeys;
 import org.apache.slider.api.SliderClusterProtocol;
@@ -205,6 +206,8 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
    * @return the exit code
    * @throws Throwable anything that went wrong
    */
+/* JDK7
+
   @Override
   public int runService() throws Throwable {
 
@@ -277,6 +280,66 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     return exitCode;
   }
 
+*/
+  @Override
+  public int runService() throws Throwable {
+
+    // choose the action
+    String action = serviceArgs.getAction();
+    int exitCode = EXIT_SUCCESS;
+    String clusterName = serviceArgs.getClusterName();
+    // actions
+    if (ACTION_BUILD.equals(action)) {
+      exitCode = actionBuild(clusterName, serviceArgs.getActionBuildArgs());
+    } else if (ACTION_CREATE.equals(action)) {
+      exitCode = actionCreate(clusterName, serviceArgs.getActionCreateArgs());
+    } else if (ACTION_FREEZE.equals(action)) {
+      exitCode = actionFreeze(clusterName,
+          serviceArgs.getActionFreezeArgs());
+    } else if (ACTION_THAW.equals(action)) {
+      exitCode = actionThaw(clusterName, serviceArgs.getActionThawArgs());
+    } else if (ACTION_DESTROY.equals(action)) {
+      exitCode = actionDestroy(clusterName);
+    } else if (ACTION_EXISTS.equals(action)) {
+      exitCode = actionExists(clusterName,
+          serviceArgs.getActionExistsArgs().live);
+    } else if (ACTION_FLEX.equals(action)) {
+      exitCode = actionFlex(clusterName, serviceArgs.getActionFlexArgs());
+    } else if (ACTION_GETCONF.equals(action)) {
+      exitCode = actionGetConf(clusterName, serviceArgs.getActionGetConfArgs());
+    } else if (ACTION_HELP.equals(action) ||
+               ACTION_USAGE.equals(action)) {
+      log.info(serviceArgs.usage());
+
+    } else if (ACTION_KILL_CONTAINER.equals(action)) {
+      exitCode = actionKillContainer(clusterName,
+          serviceArgs.getActionKillContainerArgs());
+
+    } else if (ACTION_AM_SUICIDE.equals(action)) {
+      exitCode = actionAmSuicide(clusterName,
+          serviceArgs.getActionAMSuicideArgs());
+
+    } else if (ACTION_LIST.equals(action)) {
+      exitCode = actionList(clusterName);
+    } else if (ACTION_REGISTRY.equals(action)) {
+      exitCode = actionRegistry(
+          serviceArgs.getActionRegistryArgs());
+    } else if (ACTION_STATUS.equals(action)) {
+      exitCode = actionStatus(clusterName,
+          serviceArgs.getActionStatusArgs());
+    } else if (ACTION_UPDATE.equals(action)) {
+      exitCode = actionUpdate(clusterName, serviceArgs.getActionUpdateArgs());
+
+    } else if (ACTION_VERSION.equals(action)) {
+
+      exitCode = actionVersion();
+    } else {
+      throw new SliderException(EXIT_UNIMPLEMENTED,
+          "Unimplemented: " + action);
+    }
+
+    return exitCode;
+  }
   /**
    * Delete the zookeeper node associated with the calling user and the cluster
    **/
@@ -330,7 +393,12 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
           client.createPath(zkPath, "", ZooDefs.Ids.OPEN_ACL_UNSAFE,
                             CreateMode.PERSISTENT);
           return zkPath;
-        } catch (InterruptedException | KeeperException e) {
+          
+          //JDK7
+//        } catch (InterruptedException | KeeperException e) {
+        } catch (InterruptedException e) {
+          log.warn("Unable to create zk node {}", zkPath, e);
+        } catch ( KeeperException e) {
           log.warn("Unable to create zk node {}", zkPath, e);
         }
       }
@@ -586,6 +654,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 
     // resource component args
     appConf.merge(cmdLineResourceOptions);
+    resources.merge(cmdLineResourceOptions);
     resources.mergeComponents(buildInfo.getResourceCompOptionMap());
 
     builder.init(providerName, instanceDefinition);
@@ -753,9 +822,6 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     return instanceDefinition;
 
   }
-  
-  
-
 
   /**
    *
@@ -795,16 +861,16 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
       instanceDefinition.getAppConfOperations();
     Path generatedConfDirPath =
       createPathThatMustExist(internalOptions.getMandatoryOption(
-        OptionKeys.INTERNAL_GENERATED_CONF_PATH));
+        InternalKeys.INTERNAL_GENERATED_CONF_PATH));
     Path snapshotConfPath =
       createPathThatMustExist(internalOptions.getMandatoryOption(
-        OptionKeys.INTERNAL_SNAPSHOT_CONF_PATH));
+        InternalKeys.INTERNAL_SNAPSHOT_CONF_PATH));
 
 
     // cluster Provider
     AbstractClientProvider provider = createClientProvider(
       internalOptions.getMandatoryOption(
-        OptionKeys.INTERNAL_PROVIDER_NAME));
+        InternalKeys.INTERNAL_PROVIDER_NAME));
     // make sure the conf dir is valid;
     
     // now build up the image path
@@ -1382,7 +1448,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     verifyBindingsDefined();
     SliderUtils.validateClusterName(name);
     log.debug("actionFlex({})", name);
-    Map<String, Integer> roleInstances = new HashMap<>();
+    Map<String, Integer> roleInstances = new HashMap<String, Integer>();
     Map<String, String> roleMap = args.getComponentMap();
     for (Map.Entry<String, String> roleEntry : roleMap.entrySet()) {
       String key = roleEntry.getKey();
@@ -1677,7 +1743,12 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
           return EXIT_FALSE;
         }
       }
-    } catch (YarnException | IOException e) {
+
+// JDK7    } catch (YarnException | IOException e) {
+    } catch (YarnException e) {
+      log.warn("Exception while waiting for the cluster {} to shut down: {}",
+               clustername, e);
+    } catch ( IOException e) {
       log.warn("Exception while waiting for the cluster {} to shut down: {}",
                clustername, e);
     }
@@ -1741,6 +1812,8 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     }
     try {
       String description = "Slider Application Instance " + clustername;
+// JDK7      
+/*
       switch (format) {
         case Arguments.FORMAT_XML:
           Configuration siteConf = getSiteConf(status, clustername);
@@ -1752,6 +1825,17 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
           props.store(writer, description);
           break;
         default:
+          throw new BadCommandArgumentsException("Unknown format: " + format);
+      }
+*/
+      if (Arguments.FORMAT_XML.equals(format)) {
+        Configuration siteConf = getSiteConf(status, clustername);
+        siteConf.writeXml(writer);
+      } else if (Arguments.FORMAT_PROPERTIES.equals(format)) {
+        Properties props = new Properties();
+        props.putAll(status.clientProperties);
+        props.store(writer, description);
+      } else {
           throw new BadCommandArgumentsException("Unknown format: " + format);
       }
     } finally {
@@ -1857,10 +1941,8 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
    * @throws IOException any problems loading -including a missing file
    */
   @VisibleForTesting
-  public AggregateConf loadPersistedClusterDescription(String clustername) throws
-                                                                           IOException,
-      SliderException,
-                                                                           LockAcquireFailedException {
+  public AggregateConf loadPersistedClusterDescription(String clustername)
+      throws IOException, SliderException, LockAcquireFailedException {
     Path clusterDirectory = sliderFileSystem.buildClusterDirPath(clustername);
     ConfPersister persister = new ConfPersister(sliderFileSystem, clusterDirectory);
     AggregateConf instanceDescription = new AggregateConf();
@@ -1937,7 +2019,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 
     if (uuids.length == 0) {
       // short cut on an empty list
-      return new LinkedList<>();
+      return new LinkedList<ClusterNode>();
     }
     return createClusterOperations().listClusterNodes(uuids);
   }
@@ -2124,7 +2206,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
                                       + serviceType
                                       + " name " + name);
     }
-    List<ServiceInstanceData> sids = new ArrayList<>(size);
+    List<ServiceInstanceData> sids = new ArrayList<ServiceInstanceData>(size);
     for (CuratorServiceInstance<ServiceInstanceData> instance : instances) {
       ServiceInstanceData payload = instance.payload;
       logInstance(payload, registryArgs.verbose);
@@ -2309,7 +2391,10 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     try {
       maybeStartRegistry();
       return registry.instanceIDs(SliderKeys.APP_TYPE);
-    } catch (YarnException | IOException e) {
+/// JDK7    } catch (YarnException | IOException e) {
+    } catch (IOException e) {
+      throw e;
+    } catch (YarnException e) {
       throw e;
     } catch (Exception e) {
       throw new IOException(e);

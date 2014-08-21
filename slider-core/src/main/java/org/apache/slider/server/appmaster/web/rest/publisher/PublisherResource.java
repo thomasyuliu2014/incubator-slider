@@ -113,7 +113,7 @@ public class PublisherResource extends AbstractSliderResource {
   @Produces({MediaType.APPLICATION_JSON})
   public Set<URL> getAMClassPath() {
     URL[] urls = ((URLClassLoader) getClass().getClassLoader()).getURLs();
-    return new LinkedHashSet<>(Arrays.asList(urls));
+    return new LinkedHashSet<URL>(Arrays.asList(urls));
   }
 
   @GET
@@ -234,7 +234,7 @@ public class PublisherResource extends AbstractSliderResource {
           propertyName, config);
       throw new NotFoundException("Property not found: " + propertyName);
     }
-    Map<String,String> rtnVal = new HashMap<>();
+    Map<String, String> rtnVal = new HashMap<String, String>();
     rtnVal.put(propertyName, propVal);
 
     return rtnVal;

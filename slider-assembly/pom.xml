@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.slider</groupId>
     <artifactId>slider</artifactId>
-    <version>0.41.0-incubating-SNAPSHOT</version>
+    <version>0.51.0-incubating-SNAPSHOT</version>
   </parent>
 
 
@@ -141,25 +141,11 @@
         </configuration>
         <executions>
           <execution>
-            <id>clean</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <phase>pre-clean</phase>
-          </execution>
-          <execution>
             <id>default</id>
             <goals>
               <goal>enforce</goal>
             </goals>
             <phase>validate</phase>
-          </execution>
-          <execution>
-            <id>site</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <phase>pre-site</phase>
           </execution>
         </executions>
       </plugin>

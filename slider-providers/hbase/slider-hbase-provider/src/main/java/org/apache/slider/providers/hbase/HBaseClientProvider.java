@@ -21,6 +21,7 @@ package org.apache.slider.providers.hbase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.LocalResource;
+import org.apache.slider.api.InternalKeys;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.common.SliderXmlConfKeys;
 import org.apache.slider.api.OptionKeys;
@@ -107,7 +108,7 @@ public class HBaseClientProvider extends AbstractClientProvider implements
 
     MapOperations worker = appconf.getMandatoryComponent(HBaseKeys.ROLE_WORKER);
     
-    Map<String, String> sitexml = new HashMap<>();
+    Map<String, String> sitexml = new HashMap<String, String>();
 
     //map all cluster-wide site. options
     providerUtils.propagateSiteOptions(globalAppOptions, sitexml);
@@ -122,7 +123,7 @@ public class HBaseClientProvider extends AbstractClientProvider implements
 
     sitexml.put(KEY_HBASE_ROOTDIR,
         globalInstanceOptions.getMandatoryOption(
-            OptionKeys.INTERNAL_DATA_DIR_PATH)
+            InternalKeys.INTERNAL_DATA_DIR_PATH)
     );
     providerUtils.propagateOption(globalAppOptions, OptionKeys.ZOOKEEPER_PATH,
                                   sitexml, KEY_ZNODE_PARENT);
@@ -209,7 +210,7 @@ public class HBaseClientProvider extends AbstractClientProvider implements
     }
   }
 
-  private static Set<String> knownRoleNames = new HashSet<>();
+  private static Set<String> knownRoleNames = new HashSet<String>();
   static {
     List<ProviderRole> roles = HBaseRoles.getRoles();
     knownRoleNames.add(SliderKeys.COMPONENT_AM);
@@ -262,7 +263,7 @@ public class HBaseClientProvider extends AbstractClientProvider implements
 
     // add any and all dependency files
     Map<String, LocalResource> providerResources =
-        new HashMap<>();
+        new HashMap<String, LocalResource>();
 
     ProviderUtils.addProviderJar(providerResources,
         this,

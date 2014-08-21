@@ -18,6 +18,7 @@
 
 package org.apache.slider.server.appmaster.web.rest.agent;
 
+import org.apache.slider.providers.agent.State;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
