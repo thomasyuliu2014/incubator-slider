@@ -19,6 +19,7 @@
 package org.apache.slider.client;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -48,6 +49,7 @@ import org.apache.slider.common.SliderExitCodes;
 import org.apache.slider.common.SliderKeys;
 import org.apache.slider.common.params.AbstractActionArgs;
 import org.apache.slider.common.params.AbstractClusterBuildingActionArgs;
+import org.apache.slider.common.params.ActionDiagnosticArgs;
 import org.apache.slider.common.params.ActionInstallPackageArgs;
 import org.apache.slider.common.params.ActionAMSuicideArgs;
 import org.apache.slider.common.params.ActionCreateArgs;
@@ -338,6 +340,8 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     } else if (ACTION_VERSION.equals(action)) {
 
       exitCode = actionVersion();
+    } else if (ACTION_DIAGNOSTIC.equals(action)) {
+        exitCode = actionDiagnostic(clusterName, serviceArgs.getActionDiagnosticArgs());
     } else {
       throw new SliderException(EXIT_UNIMPLEMENTED,
           "Unimplemented: " + action);
@@ -346,7 +350,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     return exitCode;
   }
 
-  /**
+/**
    * Perform everything needed to init the hadoop binding.
    * This assumes that the service is already  in inited or started state
    * @throws IOException
@@ -2370,6 +2374,32 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
       sids.add(payload);
     }
     return sids;
+  }
+
+  /**
+   * diagnostic operation
+   *
+   * @param clusterName application name
+   * @param diagosticArgs diagnostic Arguments
+   * @return 0 for success, -1 for some issues that aren't errors, just failures
+   * to retrieve information (e.g. no application name specified)
+   * @throws YarnException YARN problems
+   * @throws IOException Network or other problems
+   */
+  private int actionDiagnostic(String clusterName, ActionDiagnosticArgs diagnosticArgs) {
+	  if(diagnosticArgs.client){
+		  actionDiagnosticClient();
+	  }
+	  
+	  return EXIT_SUCCESS;
+  }
+
+  private void actionDiagnosticClient() {
+	SliderUtils.getCurrentCommandPath();
+	SliderVersionInfo.loadAndPrintVersionInfo(log);
+	SliderUtils.getClientConfigPath();
+	SliderUtils.getJDKInfo();
+	SliderUtils.validateSliderClientEnvironment(log);
   }
 
   private void logInstance(ServiceInstanceData instance,

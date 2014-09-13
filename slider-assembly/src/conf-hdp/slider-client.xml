@@ -16,27 +16,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-
 <!--
   Properties set here are picked up in the client.
-  They are not passed to the AM -though the filesystem
-  binding details (URL And principal) are added to the
-  hbase-site.xml file when a cluster is created.
+  They are not passed to the AM
 -->
 <configuration>
-
-  <property>
-    <name>yarn.log-aggregation-enable</name>
-    <value>true</value>
-  </property>
-  
-
-  <property>
-    <name>slider.yarn.queue</name>
-    <value>default</value>
-    <description>YARN queue for the Application Master</description>
-  </property>
-
 
   <property>
     <name>yarn.application.classpath</name>
@@ -44,34 +28,35 @@
       /etc/hadoop/conf,/usr/lib/hadoop/*,/usr/lib/hadoop/lib/*,/usr/lib/hadoop-hdfs/*,/usr/lib/hadoop-hdfs/lib/*,/usr/lib/hadoop-yarn/*,/usr/lib/hadoop-yarn/lib/*,/usr/lib/hadoop-mapreduce/*,/usr/lib/hadoop-mapreduce/lib/*
     </value>
   </property>
-  
-<!--
+
+  <property>
+    <name>slider.zookeeper.quorum</name>
+    <value>c6401.ambari.apache.org:2181</value>
+  </property>
 
   <property>
     <name>yarn.resourcemanager.address</name>
-    <value>master:8032</value>
+    <value>c6401.ambari.apache.org:8050</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.scheduler.address</name>
+    <value>c6401.ambari.apache.org:8030</value>
   </property>
 
   <property>
     <name>fs.defaultFS</name>
-    <value>hdfs://master:9090</value>
+    <value>hdfs://c6401.ambari.apache.org:8020</value>
   </property>
 
   <property>
-    <name>yarn.resourcemanager.principal</name>
-    <value>yarn/master@MINICLUSTER</value>
-  </property>
-
-  <property>
-    <name>slider.security.enabled</name>
+    <name>slider.test.agent.enabled</name>
     <value>true</value>
   </property>
-
+  
   <property>
-    <name>dfs.namenode.kerberos.principal</name>
-    <value>hdfs/master@MINICLUSTER</value>
+    <name>slider.test.agent.tar</name>
+    <value>hdfs://c6401.ambari.apache.org:8020/slider/agent/slider-agent.tar.gz</value>
   </property>
--->
-
 
 </configuration>

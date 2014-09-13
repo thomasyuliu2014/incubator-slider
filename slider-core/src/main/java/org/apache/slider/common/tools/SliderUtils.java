@@ -19,6 +19,7 @@
 package org.apache.slider.common.tools;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.output.ByteArrayOutputStream;
@@ -44,6 +45,7 @@ import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.slider.Slider;
 import org.apache.slider.api.InternalKeys;
 import org.apache.slider.api.RoleKeys;
 import org.apache.slider.common.SliderKeys;
@@ -1779,5 +1781,35 @@ public final class SliderUtils {
     maybeVerifyWinUtilsValid(logger);
     execCommand(OPENSSL, 0, 5000, logger, "OpenSSL", OPENSSL, "version");
     execCommand(PYTHON, 0, 5000, logger, "Python", PYTHON, "--version");
+  }
+  
+  /**
+   * Print out the path to the currently running slider command
+   * @throws NullPointerException - If the pathname argument is null
+   * @throws SecurityException - if a security manager exists and its checkPermission method doesn't allow getting the ProtectionDomain
+   */
+  public static void getCurrentCommandPath(){
+	  File f = new File(Slider.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+	  log.info("The slider command path: " + f.getAbsolutePath());
+  }
+  
+  /**
+   * Print out the path to the slider-client.xml used by the current running slider command
+   * @throws SecurityException - if a security manager exists and its checkPermission method denies access to the class loader for the class
+   */
+  public static void getClientConfigPath(){
+	  URL path = ConfigHelper.class.getClassLoader().getResource(SliderKeys.CLIENT_RESOURCE);
+	  log.info("The slider-client.xml used by current running command path: " + path.toString());
+  }
+  
+  /**
+   * Print out the version and path of the JDK invoking the current running slider command
+   * @throws SecurityException - if a security manager exists and its checkPropertyAccess method doesn't allow access to the specified system property.
+   */
+  public static void getJDKInfo(){
+	  String version = System.getProperty("java.version");
+	  String javaHome = System.getProperty("java.home");
+	  log.info("The version of the JDK invoking the current running slider command: " + version);
+	  log.info("The path to it is: " + javaHome);
   }
 }
