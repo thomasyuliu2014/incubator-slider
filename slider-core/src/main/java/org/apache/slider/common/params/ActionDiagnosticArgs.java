@@ -3,8 +3,8 @@ package org.apache.slider.common.params;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 
-@Parameters(commandNames = {SliderActions.ACTION_THAW},
-commandDescription = SliderActions.DESCRIBE_ACTION_THAW)
+@Parameters(commandNames = {SliderActions.ACTION_DIAGNOSTIC},
+commandDescription = SliderActions.DESCRIBE_ACTION_DIAGNOSTIC)
 public class ActionDiagnosticArgs extends AbstractActionArgs
 {
 	
@@ -15,30 +15,42 @@ public class ActionDiagnosticArgs extends AbstractActionArgs
 	
 	  @Parameter(names = {ARG_CLIENT}, 
 	      description = "print configuration of the slider client")
-	  public boolean client;
+	  public boolean client = false;
 	
 	  @Parameter(names = {ARG_SLIDER}, 
 	      description = "print configuration of the running slider app master")
-	  public boolean slider;
+	  public String slider;
 	
 	  @Parameter(names = {ARG_APPLICATION}, 
 	      description = "print configuration of the running application")
-	  public boolean application;
-	
+	  public String application;
+
+	  @Parameter(names = {ARG_VERBOSE}, 
+	      description = "print out information in details")
+	  public boolean verbose = false;
+
 	  @Parameter(names = {ARG_YARN}, 
 	      description = "print configuration of the YARN cluster")
-	  public boolean yarn;
+	  public boolean yarn = false;
 	
 	  @Parameter(names = {ARG_CREDENTIALS}, 
 	      description = "print credentials of the current user")
-	  public boolean credentials;
+	  public boolean credentials = false;
 	
 	  @Parameter(names = {ARG_ALL}, 
 	      description = "print all of the information above")
-	  public boolean all;
+	  public String all;
 	
-	  @Parameter(names = {ARG_INTELLIGENT}, 
+	  @Parameter(names = {ARG_LEVEL}, 
 	      description = "diagnoze the application intelligently")
-	  public boolean intelligent;
+	  public String level;
 
+	  /**
+	   * Get the min #of params expected
+	   * @return the min number of params in the {@link #parameters} field
+	   */
+	  @Override
+	  public int getMinParams() {
+	    return 0;
+	  }
 }

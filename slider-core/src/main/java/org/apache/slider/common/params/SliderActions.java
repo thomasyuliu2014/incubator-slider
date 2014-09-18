@@ -79,4 +79,7 @@ public interface SliderActions {
   String DESCRIBE_ACTION_VERSION =
                         "Print the Slider version information";
   String DESCRIBE_ACTION_INSTALL_PACKAGE = "Install the application package in the home directory under sub-folder packages";
+  String DESCRIBE_ACTION_DIAGNOSTIC = "Diagnose the configuration of the running slider application and slider client";
+  
 }
+

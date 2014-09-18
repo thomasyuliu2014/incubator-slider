@@ -84,7 +84,7 @@ public interface Arguments {
   String ARG_YARN = "--yarn";
   String ARG_CREDENTIALS = "--credentials";
   String ARG_ALL = "--all";
-  String ARG_INTELLIGENT = "--intelligent";
+  String ARG_LEVEL = "--level";
 
 
   /**
