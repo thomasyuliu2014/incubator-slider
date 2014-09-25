@@ -2342,13 +2342,12 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
         outputConfig(publishedConfiguration, registryArgs);
       } else {
         // it's an unknown command
-        throw new BadCommandArgumentsException(
-            "Bad command arguments for " + ACTION_REGISTRY + " " +
-            registryArgs);
+        log.info(ActionRegistryArgs.USAGE);
+        return EXIT_USAGE;
       }
     } catch (FileNotFoundException e) {
       log.info("{}", e.toString());
-      log.debug("{}",e, e);
+      log.debug("{}", e, e);
       return EXIT_NOT_FOUND;
     }
     return EXIT_SUCCESS;
