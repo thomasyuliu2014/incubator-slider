@@ -2423,8 +2423,13 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 				actionDiagnosticAll(diagnosticArgs);
 			} else if (SliderUtils.isSet(diagnosticArgs.level)) {
 				actionDiagnosticIntelligent(diagnosticArgs);
+			} else {
+				// it's an unknown command
+		        log.info(ActionDiagnosticArgs.USAGE);
+		        return EXIT_USAGE;
 			}
 		} catch (Exception e) {
+			log.error(e.toString());
 			return EXIT_FALSE;
 		}
 		return EXIT_SUCCESS;
@@ -2458,6 +2463,14 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 					.getInstanceDefinition();
 			String imagePath = instanceDefinition.getInternalOperations().get(
 					InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+			//if null, that means slider uploaded the agent tarball for the user
+			//and we need to use where slider has put
+			if(imagePath == null){
+				ApplicationReport appReport = YARNRegistryClient.findInstance(clusterName);
+				Path path1 = sliderFileSystem.getTempPathForCluster(clusterName);
+				Path subPath = new Path(path1, appReport.getApplicationId().toString() + "/am");
+				imagePath = subPath.toString();
+			}
 			try {
 				SliderUtils.validateHDFSFile(sliderFileSystem, imagePath);
 				log.info("Slider agent tarball is properly installed");
@@ -2569,6 +2582,13 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 		}
 		String imagePath = instanceDefinition.getInternalOperations().get(
 				InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
+		//if null, it will be uploaded by Slider and thus at slider's path
+		//if(imagePath == null){
+			ApplicationReport appReport = YARNRegistryClient.findInstance(clusterName);
+			Path path1 = sliderFileSystem.getTempPathForCluster(clusterName);
+			Path subPath = new Path(path1, appReport.getApplicationId().toString() + "/am");
+			imagePath = subPath.toString();
+		//}
 		log.info("The path of slider agent tarball on HDFS is: " + imagePath);
 	}
 
