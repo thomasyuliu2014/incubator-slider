@@ -637,11 +637,11 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 
     Path srcFile = null;
     if (null == installPkgInfo.name || installPkgInfo.name.length() == 0) {
-      throw new BadCommandArgumentsException("A valid application name is required.");
+      throw new BadCommandArgumentsException("A valid application type name is required (e.g. HBASE).");
     }
 
     if (null == installPkgInfo.packageURI || installPkgInfo.packageURI.length() == 0) {
-      throw new BadCommandArgumentsException("A valid application package is required.");
+      throw new BadCommandArgumentsException("A valid application package location required.");
     } else {
       File pkgFile = new File(installPkgInfo.packageURI);
       if (!pkgFile.exists() || pkgFile.isDirectory()) {
@@ -660,7 +660,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     if (sliderFileSystem.getFileSystem().exists(fileInFs) && !installPkgInfo.replacePkg) {
       throw new BadCommandArgumentsException("Pkg exists at " +
                                              fileInFs.toUri().toString() +
-                                             ". Use --replacePkg to overwrite.");
+                                             ". Use --replacepkg to overwrite.");
     }
 
     sliderFileSystem.getFileSystem().copyFromLocalFile(false, installPkgInfo.replacePkg, srcFile, fileInFs);
@@ -797,6 +797,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     builder.propagateFilename();
     builder.propagatePrincipals();
     builder.setImageDetailsIfAvailable(buildInfo.getImage(), buildInfo.getAppHomeDir());
+    builder.setQueue(buildInfo.queue);
 
     String quorum = buildInfo.getZKhosts();
     if (SliderUtils.isUnset(quorum)) {
@@ -1045,6 +1046,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     }
     MapOperations sliderAMResourceComponent =
       resourceOperations.getOrAddComponent(SliderKeys.COMPONENT_AM);
+    MapOperations resourceGlobalOptions = resourceOperations.getGlobalOptions();
 
     // add the tags if available
     Set<String> applicationTags = provider.getApplicationTags(sliderFileSystem,
@@ -1056,6 +1058,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
         yarnClient,
         clusterSecure,
         sliderAMResourceComponent,
+        resourceGlobalOptions,
         applicationTags);
 
     ApplicationId appId = amLauncher.getApplicationId();
@@ -1276,7 +1279,11 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     // Set the queue to which this application is to be submitted in the RM
     // Queue for App master
     String amQueue = config.get(KEY_YARN_QUEUE, DEFAULT_YARN_QUEUE);
-
+    String suppliedQueue = internalOperations.getGlobalOptions().get(InternalKeys.INTERNAL_QUEUE);
+    if(!SliderUtils.isUnset(suppliedQueue)) {
+      amQueue = suppliedQueue;
+      log.info("Using queue {} for the application instance.", amQueue);
+    }
     amLauncher.setQueue(amQueue);
 
     // Submit the application to the applications manager

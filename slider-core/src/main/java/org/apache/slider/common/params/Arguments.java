@@ -85,6 +85,7 @@ public interface Arguments {
   String ARG_CREDENTIALS = "--credentials";
   String ARG_ALL = "--all";
   String ARG_LEVEL = "--level";
+  String ARG_QUEUE = "--queue";
 
 
   /**
