@@ -2591,12 +2591,12 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 		String imagePath = instanceDefinition.getInternalOperations().get(
 				InternalKeys.INTERNAL_APPLICATION_IMAGE_PATH);
 		//if null, it will be uploaded by Slider and thus at slider's path
-		//if(imagePath == null){
+		if(imagePath == null){
 			ApplicationReport appReport = YARNRegistryClient.findInstance(clusterName);
 			Path path1 = sliderFileSystem.getTempPathForCluster(clusterName);
 			Path subPath = new Path(path1, appReport.getApplicationId().toString() + "/am");
 			imagePath = subPath.toString();
-		//}
+		}
 		log.info("The path of slider agent tarball on HDFS is: " + imagePath);
 	}
 
