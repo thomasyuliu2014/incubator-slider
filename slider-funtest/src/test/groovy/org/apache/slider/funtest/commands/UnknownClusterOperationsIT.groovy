@@ -96,5 +96,25 @@ public class UnknownClusterOperationsIT extends CommandTestBase {
   public void testGetConfUnknownCluster() throws Throwable {
     assertUnknownCluster(getConf(UNKNOWN))
   }
-
+  
+  @Test
+  public void testDiagnosticApplicationOptionUnknownCluster() throws Throwable {
+	assertUnknownCluster(diagnostic(Arguments.ARG_APPLICATION, UNKNOWN))
+  }
+  
+  @Test
+  public void testDiagnosticAllOptionUnknownCluster() throws Throwable {
+	assertUnknownCluster(diagnostic(Arguments.ARG_ALL, UNKNOWN))
+  }
+  
+  @Test
+  public void testDiagnosticSliderOptionUnknownCluster() throws Throwable {
+	assertUnknownCluster(diagnostic(Arguments.ARG_SLIDER, UNKNOWN))
+  }
+  
+  @Test
+  public void testDiagnosticLevelOptionUnknownCluster() throws Throwable {
+	assertUnknownCluster(diagnostic(Arguments.ARG_LEVEL, UNKNOWN))
+  }
+  
 }

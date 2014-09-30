@@ -1,5 +1,9 @@
 package org.apache.slider.common.params;
 
+import org.apache.slider.common.tools.SliderUtils;
+import org.apache.slider.core.exceptions.BadCommandArgumentsException;
+import org.apache.slider.core.exceptions.UsageException;
+
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 
@@ -63,4 +67,18 @@ public class ActionDiagnosticArgs extends AbstractActionArgs
 	  public int getMinParams() {
 	    return 0;
 	  }
+
+    /**
+     * validate health of all the different operations
+     * 
+     * @throws BadCommandArgumentsException
+     */
+    @Override
+    public void validate() throws BadCommandArgumentsException, UsageException {
+        if (client == false && slider == null && application == null
+                && yarn == false && credentials == false && all == null
+                && level == null) {
+            throw new UsageException(USAGE);
+        }
+    }
 }

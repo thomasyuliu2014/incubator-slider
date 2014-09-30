@@ -2414,34 +2414,32 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 	 *             YARN problems
 	 * @throws IOException
 	 *             Network or other problems
+	 * @throws URISyntaxException 
 	 */
-	private int actionDiagnostic(ActionDiagnosticArgs diagnosticArgs) {
-		try {
-			if (diagnosticArgs.client) {
-				actionDiagnosticClient();
-			} else if (SliderUtils.isSet(diagnosticArgs.application)) {
-				actionDiagnosticApplication(diagnosticArgs);
-			} else if (SliderUtils.isSet(diagnosticArgs.slider)) {
-				actionDiagnosticSlider(diagnosticArgs);
-			} else if (diagnosticArgs.yarn) {
-				actionDiagnosticYarn(diagnosticArgs);
-			} else if (diagnosticArgs.credentials) {
-				actionDiagnosticCredentials();
-			} else if (SliderUtils.isSet(diagnosticArgs.all)) {
-				actionDiagnosticAll(diagnosticArgs);
-			} else if (SliderUtils.isSet(diagnosticArgs.level)) {
-				actionDiagnosticIntelligent(diagnosticArgs);
-			} else {
-				// it's an unknown command
-		        log.info(ActionDiagnosticArgs.USAGE);
-		        return EXIT_USAGE;
-			}
-		} catch (Exception e) {
-			log.error(e.toString());
-			return EXIT_FALSE;
-		}
-		return EXIT_SUCCESS;
-	}
+    private int actionDiagnostic(ActionDiagnosticArgs diagnosticArgs) throws IOException, YarnException, URISyntaxException {
+
+        if (diagnosticArgs.client) {
+            actionDiagnosticClient();
+        } else if (SliderUtils.isSet(diagnosticArgs.application)) {
+            actionDiagnosticApplication(diagnosticArgs);
+        } else if (SliderUtils.isSet(diagnosticArgs.slider)) {
+            actionDiagnosticSlider(diagnosticArgs);
+        } else if (diagnosticArgs.yarn) {
+            actionDiagnosticYarn(diagnosticArgs);
+        } else if (diagnosticArgs.credentials) {
+            actionDiagnosticCredentials();
+        } else if (SliderUtils.isSet(diagnosticArgs.all)) {
+            actionDiagnosticAll(diagnosticArgs);
+        } else if (SliderUtils.isSet(diagnosticArgs.level)) {
+            actionDiagnosticIntelligent(diagnosticArgs);
+        } else {
+            // it's an unknown command
+            log.info(ActionDiagnosticArgs.USAGE);
+            return EXIT_USAGE;
+        }
+
+        return EXIT_SUCCESS;
+    }
 
 	private void actionDiagnosticIntelligent(ActionDiagnosticArgs diagnosticArgs)
 			throws YarnException, IOException, URISyntaxException {
@@ -2460,7 +2458,16 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 					+ e.toString());
 			return;
 		}
-		SliderClusterOperations clusterOperations = createClusterOperations(clusterName);
+		SliderClusterOperations clusterOperations = null;
+		try{
+		    clusterOperations = createClusterOperations(clusterName);
+		} catch (YarnException e) {
+            log.error("Exception happened when retrieving instance definition from YARN: " + e.toString());
+            throw e;
+        } catch (IOException e) {
+            log.error("Network problem happened when retrieving instance definition from YARN: " + e.toString());
+            throw e;
+        }
 		// cluster not found exceptions will be thrown upstream
 		ClusterDescription clusterDescription = clusterOperations
 				.getClusterDescription();

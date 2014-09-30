@@ -243,6 +243,12 @@ abstract class CommandTestBase extends SliderTestUtils {
         ACTION_GETCONF, name
     ])
   }
+  
+  static SliderShell diagnostic(String option, String name) {
+	slider([
+		ACTION_DIAGNOSTIC, option, name
+	])
+  }
 
   static SliderShell getConf(int result, String name) {
     slider(result,
