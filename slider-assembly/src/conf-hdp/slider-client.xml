@@ -16,6 +16,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
+
 <!--
   Properties set here are picked up in the client.
 -->
@@ -69,10 +70,12 @@
     <name>slider.security.enabled</name>
     <value>true</value>
   </property>
-  
+
   <property>
     <name>dfs.namenode.kerberos.principal</name>
     <value>hdfs/master@MINICLUSTER</value>
   </property>
 -->
+
+
 </configuration>
