@@ -161,7 +161,7 @@ public class AgentProviderService extends AbstractProviderService implements
   private Boolean canAnyMasterPublish = null;
   private AgentLaunchParameter agentLaunchParameter = null;
   private String clusterName = null;
-
+  
   private final Map<String, ComponentInstanceState> componentStatuses =
       new ConcurrentHashMap<String, ComponentInstanceState>();
   private final Map<String, Map<String, String>> componentInstanceData =
@@ -185,6 +185,7 @@ public class AgentProviderService extends AbstractProviderService implements
       });
   private final Map<String, Set<String>> containerExportsMap =
       new HashMap<String, Set<String>>();
+  private boolean dockerMode;
 
   /**
    * Create an instance of AgentProviderService
@@ -292,7 +293,8 @@ public class AgentProviderService extends AbstractProviderService implements
                                           Path generatedConfPath,
                                           MapOperations resourceComponent,
                                           MapOperations appComponent,
-                                          Path containerTmpDirPath) throws
+                                          Path containerTmpDirPath,
+                                          boolean dockerMode) throws
       IOException,
       SliderException {
 
@@ -300,7 +302,7 @@ public class AgentProviderService extends AbstractProviderService implements
         getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
 
     initializeApplicationConfiguration(instanceDefinition, fileSystem);
-
+    
     log.info("Build launch context for Agent");
     log.debug(instanceDefinition.toString());
 
@@ -318,6 +320,12 @@ public class AgentProviderService extends AbstractProviderService implements
     }
     // for 2-Way SSL
     launcher.setEnv(SLIDER_PASSPHRASE, instanceDefinition.getPassphrase());
+
+    // if we launch application docker container instead of application process
+    if(dockerMode){
+      launcher.setEnv(DOCKER_MODE, "True");
+      this.dockerMode = true;
+    }
 
     //local resources
 
@@ -1716,6 +1724,7 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, String> hostLevelParams = new TreeMap<String, String>();
     hostLevelParams.put(JAVA_HOME, appConf.getGlobalOptions().getMandatoryOption(JAVA_HOME));
     hostLevelParams.put(CONTAINER_ID, containerId);
+    
     cmd.setHostLevelParams(hostLevelParams);
 
     Map<String, String> roleParams = new TreeMap<String, String>();
@@ -1723,6 +1732,8 @@ public class AgentProviderService extends AbstractProviderService implements
     cmd.getRoleParams().put("auto_restart", Boolean.toString(isMarkedAutoRestart));
 
     cmd.setCommandParams(setCommandParameters(scriptPath, timeout, true));
+    
+    //if docker mode, check
 
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
@@ -1754,6 +1765,9 @@ public class AgentProviderService extends AbstractProviderService implements
         Boolean.toString(isMarkedAutoRestart));
 
     cmdStop.setCommandParams(setCommandParameters(scriptPath, timeout, true));
+    if(dockerMode){
+      cmdStop.getCommandParams().put("container_name", "tutum/memcached");
+    }
 
     Map<String, Map<String, String>> configurationsStop = buildCommandConfigurations(
         appConf, containerId, componentName);

@@ -60,6 +60,7 @@ public interface ProviderService extends ProviderCore,
    * @param generatedConfPath
    * @param appComponent
    * @param containerTmpDirPath
+   * @param dockerMode 
    */
   void buildContainerLaunchContext(ContainerLauncher containerLauncher,
       AggregateConf instanceDefinition,
@@ -69,7 +70,7 @@ public interface ProviderService extends ProviderCore,
       Path generatedConfPath,
       MapOperations resourceComponent,
       MapOperations appComponent,
-      Path containerTmpDirPath) throws
+      Path containerTmpDirPath, boolean dockerMode) throws
       IOException,
       SliderException;
 

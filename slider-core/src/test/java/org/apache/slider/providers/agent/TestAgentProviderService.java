@@ -361,7 +361,7 @@ public class TestAgentProviderService {
                                           generatedConfPath,
                                           resourceComponent,
                                           appComponent,
-                                          containerTmpDirPath);
+                                          containerTmpDirPath, false);
       // JDK7
     } catch (IOException he) {
       log.warn("{}", he, he);
@@ -1130,7 +1130,7 @@ public class TestAgentProviderService {
                                           generatedConfPath,
                                           resourceComponent,
                                           appComponent,
-                                          containerTmpDirPath);
+                                          containerTmpDirPath, false);
 
       mockAps.buildContainerLaunchContext(launcher2,
                                           instanceDefinition,
@@ -1140,7 +1140,7 @@ public class TestAgentProviderService {
                                           generatedConfPath,
                                           resourceComponent,
                                           appComponent,
-                                          containerTmpDirPath);
+                                          containerTmpDirPath, false);
 
       // Both containers register
       Register reg = new Register();

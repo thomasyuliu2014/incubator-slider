@@ -241,13 +241,14 @@ def main():
 
   logger.info("Using AGENT_WORK_ROOT = " + options.root_folder)
   logger.info("Using AGENT_LOG_ROOT = " + options.log_folder)
+  logger.info("my agent")
 
   if len(all_log_folders) > 1:
     logger.info("Selected log folder from available: " + ",".join(all_log_folders))
 
   # Extract the AM hostname and secured port from ZK registry
   zk_lookup_tries = 0
-  while zk_lookup_tries < Constants.MAX_AM_CONNECT_RETRIES:
+  while zk_lookup_tries < 1:
     registry = Registry(options.zk_quorum, options.zk_reg_path)
     amHost, amUnsecuredPort, amSecuredPort = registry.readAMHostPort()
 

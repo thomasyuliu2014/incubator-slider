@@ -123,7 +123,7 @@ public class HBaseProviderService extends AbstractProviderService
       Path generatedConfPath,
       MapOperations resourceComponent,
       MapOperations appComponent,
-      Path containerTmpDirPath) throws IOException, SliderException {
+      Path containerTmpDirPath, boolean docker) throws IOException, SliderException {
 
     // Set the environment
     launcher.putEnv(SliderUtils.buildEnvMap(appComponent));

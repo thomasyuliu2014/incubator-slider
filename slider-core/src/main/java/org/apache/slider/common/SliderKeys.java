@@ -182,6 +182,7 @@ public interface SliderKeys extends SliderXmlConfKeys {
   String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   String HADOOP_PROXY_USER = "HADOOP_PROXY_USER";
   String SLIDER_PASSPHRASE = "SLIDER_PASSPHRASE";
+  String DOCKER_MODE = "DOCKER_MODE";
 
   boolean PROPAGATE_RESOURCE_OPTION = true;
 

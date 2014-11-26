@@ -194,7 +194,7 @@ class MockProviderService implements ProviderService {
       Path generatedConfPath,
       MapOperations resourceComponent,
       MapOperations appComponent,
-      Path containerTmpDirPath) throws IOException, SliderException {
+      Path containerTmpDirPath, boolean docker_mode) throws IOException, SliderException {
 
   }
 

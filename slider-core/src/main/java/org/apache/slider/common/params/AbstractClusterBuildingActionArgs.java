@@ -97,6 +97,10 @@ public abstract class AbstractClusterBuildingActionArgs extends
              description = "Queue to submit the application")
   public String queue;
 
+  @Parameter(names = {ARG_DOCKER},
+             description = "Queue to submit the application")
+  public boolean docker_mode;
+
   @ParametersDelegate
   public ComponentArgsDelegate componentDelegate = new ComponentArgsDelegate();
 

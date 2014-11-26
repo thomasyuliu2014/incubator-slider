@@ -1683,7 +1683,11 @@ public final class SliderUtils {
     try {
       appStream = fs.open(appPath);
       ZipArchiveInputStream zis = new ZipArchiveInputStream(appStream);
+      
+      byte[] b = new byte[100];
+      
       ZipArchiveEntry zipEntry;
+      
       boolean done = false;
       while (!done && (zipEntry = zis.getNextZipEntry()) != null) {
         if (entry.equals(zipEntry.getName())) {

@@ -82,7 +82,7 @@ public class SliderAMProviderService extends AbstractProviderService implements
       Path generatedConfPath,
       MapOperations resourceComponent,
       MapOperations appComponent,
-      Path containerTmpDirPath) throws IOException, SliderException {
+      Path containerTmpDirPath, boolean dockerMode) throws IOException, SliderException {
     
   }
 

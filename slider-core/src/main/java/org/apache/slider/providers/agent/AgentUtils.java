@@ -43,6 +43,9 @@ public class AgentUtils {
     log.info("Reading metainfo at {}", appDef);
     FileSystem fs = fileSystem.getFileSystem();
     Path appPath = new Path(appDef);
+    InputStream inputStream =
+        fileSystem.getFileSystem().open(appPath);
+    log.info("inputStream:" + inputStream.toString());
     InputStream metainfoStream = SliderUtils.getApplicationResourceInputStream(
         fs, appPath, "metainfo.xml");
     if (metainfoStream == null) {

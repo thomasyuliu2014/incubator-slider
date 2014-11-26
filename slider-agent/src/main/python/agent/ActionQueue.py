@@ -157,7 +157,11 @@ class ActionQueue(threading.Thread):
       logger.info("Component has indicated auto-restart. Saving details from START command.")
 
     # running command
-    commandresult = self.customServiceOrchestrator.runCommand(command,
+    if True:
+      docker_command = "docker run -p 11211:11211 tutum/memcached"
+      proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
+    else:
+      commandresult = self.customServiceOrchestrator.runCommand(command,
                                                               in_progress_status[
                                                                 'tmpout'],
                                                               in_progress_status[

@@ -202,7 +202,8 @@ public class RoleLaunchService
             generatedConfDirPath,
             resourceComponent,
             appComponent,
-            containerTmpDirPath);
+            containerTmpDirPath,
+            true);
 
         RoleInstance instance = new RoleInstance(container);
         String[] envDescription = containerLauncher.dumpEnvToString();

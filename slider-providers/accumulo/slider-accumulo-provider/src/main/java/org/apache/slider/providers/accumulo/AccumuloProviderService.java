@@ -125,7 +125,7 @@ public class AccumuloProviderService extends AbstractProviderService implements
       Path generatedConfPath,
       MapOperations resourceComponent,
       MapOperations appComponent,
-      Path containerTmpDirPath) throws IOException, SliderException {
+      Path containerTmpDirPath, boolean docker) throws IOException, SliderException {
 
     this.fileSystem = fileSystem;
     
