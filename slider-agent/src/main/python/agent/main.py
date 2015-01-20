@@ -208,7 +208,7 @@ def main():
 
   if not IS_WINDOWS:
     bind_signal_handlers()
-
+  
   # Check for configuration file.
   agentConfig = AgentConfig(options.root_folder, options.log_folder, options.label)
   update_config_from_file(agentConfig)

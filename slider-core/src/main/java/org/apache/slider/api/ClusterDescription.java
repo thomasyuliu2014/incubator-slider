@@ -450,7 +450,7 @@ public class ClusterDescription implements Cloneable {
   public String getMandatoryOption(String key) throws BadConfigException {
     String val = options.get(key);
     if (val == null) {
-      throw new BadConfigException("Missing option " + key);
+      //throw new BadConfigException("Missing option " + key);
     }
     return val;
   }
@@ -522,8 +522,7 @@ public class ClusterDescription implements Cloneable {
     }
     String val = roleopts.get(option);
     if (val == null) {
-      throw new BadConfigException("Missing option '%s' in role %s ", option,
-                                   role);
+      //throw new BadConfigException("Missing option '%s' in role %s ", option,  role);
     }
     return val;
   }

@@ -239,6 +239,8 @@ class CustomServiceOrchestrator():
       os.unlink(file_path)
 
     self.finalize_command(command, store_command, allocated_ports)
+    
+    logger.info('finalized_command: ' + str(command))
 
     with os.fdopen(os.open(file_path, os.O_WRONLY | os.O_CREAT,
                            0644), 'w') as f:
@@ -261,6 +263,7 @@ class CustomServiceOrchestrator():
 
     port_allocation_req = allocated_for_this_component_format.format(component)
     allowed_ports = self.get_allowed_ports(command)
+    
     if 'configurations' in command:
       for key in command['configurations']:
         if len(command['configurations'][key]) > 0:
@@ -272,11 +275,17 @@ class CustomServiceOrchestrator():
                                     self.config.getLogPath())
               if port_allocation_req in value:
                 value = self.allocate_ports(value, port_allocation_req, allowed_ports)
+                
+                logger.info("allocated port in port_allocation_req: " + str(value))
+                
                 allocated_ports[key + "." + k] = value
               elif allocated_for_any in value:
                 ## All unallocated ports should be set to 0
                 logger.info("Assigning port 0 " + "for " + value)
                 value = self.set_all_unallocated_ports(value)
+                
+                logger.info("allocated port in allocated_for_any: " + str(value))
+                
               command['configurations'][key][k] = value
               pass
             pass

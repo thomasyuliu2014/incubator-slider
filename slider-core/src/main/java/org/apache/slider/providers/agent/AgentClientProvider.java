@@ -113,7 +113,7 @@ public class AgentClientProvider extends AbstractClientProvider
   @Override
   public void validateInstanceDefinition(AggregateConf instanceDefinition, SliderFileSystem fs) throws
       SliderException {
-    super.validateInstanceDefinition(instanceDefinition, fs);
+/*    super.validateInstanceDefinition(instanceDefinition, fs);
     log.debug("Validating conf {}", instanceDefinition);
     ConfTreeOperations resources =
         instanceDefinition.getResourceOperations();
@@ -207,7 +207,7 @@ public class AgentClientProvider extends AbstractClientProvider
         }
       }
     }
-  }
+*/  }
 
 
   @Override

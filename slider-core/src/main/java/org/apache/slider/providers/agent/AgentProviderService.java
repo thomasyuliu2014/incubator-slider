@@ -640,7 +640,8 @@ public class AgentProviderService extends AbstractProviderService implements
       response.setLog("Label not recognized.");
       log.warn("Received registration request from unknown label {}", label);
     }
-    log.info("Registration response: " + response);
+    log.info("aaa Registration response: " + response);
+    
     return response;
   }
 
@@ -758,7 +759,7 @@ public class AgentProviderService extends AbstractProviderService implements
       componentStatus.applyCommandResult(CommandResult.FAILED, command);
     }
 
-    log.debug("Heartbeat response: " + response);
+    log.debug("aaa Heartbeat response: " + response);
     return response;
   }
 
@@ -1602,6 +1603,14 @@ public class AgentProviderService extends AbstractProviderService implements
     cmd.setCommandParams(setCommandParameters(scriptPath, timeout, false));
 
     cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
+    
+    Map<String, String> dockerConfig = new HashMap<String, String>();
+    //dockerConfig.put("image_name", "borja/docker-memcached");
+    dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
+    configurations.put("docker", dockerConfig);
+
+    log.info("aaa configurationstop: " + appConf.getGlobalOptions().get("docker.image_name"));
+    
     response.addExecutionCommand(cmd);
   }
 
@@ -1676,6 +1685,9 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
     cmd.setConfigurations(configurations);
+    
+    log.info("aaa status configuration" + configurations.toString());
+    log.info("aaa status" + cmd);
 
     response.addStatusCommand(cmd);
   }
@@ -1699,6 +1711,9 @@ public class AgentProviderService extends AbstractProviderService implements
 
     hostLevelParams.put(CONTAINER_ID, containerId);
 
+    log.info("aaa getconfig param " + hostLevelParams.toString());
+    log.info("aaa getconfig command " + cmd);
+    
     response.addStatusCommand(cmd);
   }
 
@@ -1737,6 +1752,11 @@ public class AgentProviderService extends AbstractProviderService implements
 
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
+    Map<String, String> dockerConfig = new HashMap<String, String>();
+    //dockerConfig.put("image_name", "borja/docker-memcached");
+    dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
+    configurations.put("docker", dockerConfig);
+    
     cmd.setConfigurations(configurations);
     response.addExecutionCommand(cmd);
     
@@ -1772,6 +1792,9 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, Map<String, String>> configurationsStop = buildCommandConfigurations(
         appConf, containerId, componentName);
     cmdStop.setConfigurations(configurationsStop);
+    
+    log.info("aaa configurationstop: " + appConf);
+    
     response.addExecutionCommand(cmdStop);
   }
 
@@ -1792,6 +1815,9 @@ public class AgentProviderService extends AbstractProviderService implements
         }
       }
     }
+    
+    log.info("aaa allocated ports" + this.allocatedPorts.get(containerId));
+    
     return this.allocatedPorts.get(containerId);
   }
 

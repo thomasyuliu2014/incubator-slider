@@ -1189,8 +1189,9 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     MapOperations resourceGlobalOptions = resourceOperations.getGlobalOptions();
 
     // add the tags if available
-    Set<String> applicationTags = provider.getApplicationTags(sliderFileSystem,
-        appOperations.getGlobalOptions().get(AgentKeys.APP_DEF));
+    //Set<String> applicationTags = provider.getApplicationTags(sliderFileSystem,
+    //    appOperations.getGlobalOptions().get(AgentKeys.APP_DEF));
+    Set<String> applicationTags = new HashSet<String>();
     AppMasterLauncher amLauncher = new AppMasterLauncher(clustername,
         SliderKeys.APP_TYPE,
         config,
@@ -2462,9 +2463,9 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
       throw unknownClusterException("(undefined)");
     }
     ApplicationReport instance = findInstance(clustername);
-    if (null == instance) {
-      throw unknownClusterException(clustername);
-    }
+    //if (null == instance) {
+    //  throw unknownClusterException(clustername);
+    //}
     return connect(instance);
   }
 

@@ -2,6 +2,9 @@
     "schema": "http://example.org/specification/v2.0.0",
     "metadata": {
     },
+    "docker":{
+    	"image_name":"borja/docker-memcached"
+    },
     "global": {
         "application.def": ".slider/package/HBASE/slider-hbase-app-package-${pkg.version}.zip",
         "create.default.zookeeper.node": "true",

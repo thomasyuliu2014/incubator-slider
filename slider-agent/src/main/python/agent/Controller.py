@@ -275,7 +275,7 @@ class Controller(threading.Thread):
         response = self.sendRequest(self.heartbeatUrl, data)
         response = json.loads(response)
 
-        logger.debug('Got server response: ' + pprint.pformat(response))
+        logger.debug('aaa Got server response: ' + pprint.pformat(response))
 
         serverId = int(response['responseId'])
 

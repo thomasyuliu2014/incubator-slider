@@ -25,6 +25,8 @@ import threading
 import pprint
 import os
 import time
+import subprocess
+import getpass
 
 from AgentConfig import AgentConfig
 from AgentToggleLogger import AgentToggleLogger
@@ -116,6 +118,9 @@ class ActionQueue(threading.Thread):
 
 
   def execute_command(self, command):
+      
+    logger.info("aaa execution command " + str(command))
+      
     '''
     Executes commands of type  EXECUTION_COMMAND
     '''
@@ -128,7 +133,8 @@ class ActionQueue(threading.Thread):
       cluster=clusterName)
     logger.info(message)
     logger.debug(pprint.pformat(command))
-
+    logger.info("username")
+    logger.info(getpass.getuser())
     taskId = command['taskId']
 
     # if auto generated then do not report result
@@ -157,11 +163,62 @@ class ActionQueue(threading.Thread):
       logger.info("Component has indicated auto-restart. Saving details from START command.")
 
     # running command
-    if True:
-      docker_command = "docker run -p 11211:11211 tutum/memcached"
-      proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-    else:
-      commandresult = self.customServiceOrchestrator.runCommand(command,
+    imageName = ''
+    containerPort = '11211'
+    hostPort = '11211'
+    if 'roleParams' in command:
+        if 'imageName' in command:
+            imageName = command['roleParams']['imageName']
+        if 'containerPort' in command:
+            containerPort = command['roleParams']['containerPort']
+        
+    
+    logger.info('allocatedPorts: ' + hostPort)
+    logger.info('image name: ' + imageName)
+    
+    logger.info("command fromhost: " + str(command))
+    
+    if 'configurations' in command:
+        logger.info(str( command['configurations']))
+        if 'docker' in command['configurations']:
+            logger.info(str( command['configurations']['docker']))
+            if 'docker.image_name' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.image_name'])
+                imageName = command['configurations']['docker']['docker.image_name']
+    
+    if command['roleCommand'] == 'INSTALL':
+        docker_command = ["/usr/bin/docker", "pull", imageName]
+        proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
+        out = proc.communicate()
+        #out = subprocess.call(docker_command)
+        logger.info("docker install: " + str(docker_command))
+        logger.info(str(out))
+        
+    #if command['roleCommand'] == 'START':
+        docker_command = ["/usr/bin/docker", "run", "-d", "-p"]
+        docker_command.append(hostPort+":"+containerPort)
+        docker_command.append("-v")
+        docker_command.append("/vagrant")
+        docker_command.append("-name")
+        docker_command.append( "docker_try")
+        docker_command.append(imageName)
+        
+        proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
+        out = proc.communicate()
+        #out = subprocess.call(docker_command)
+        logger.info("docker run" + str(docker_command))
+        logger.info(str(out))
+        """
+        docker_command = ["/usr/bin/docker", "exec", "-d", "docker_try", "ls", "/vagrant"]
+        proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
+        out = proc.communicate()
+        #out = subprocess.call(docker_command)
+        logger.info("docker run2" + str(docker_command))
+        logger.info(str(out))
+        """
+    commandresult = self.customServiceOrchestrator.runCommand(command,
+                                                              
+                                                              
                                                               in_progress_status[
                                                                 'tmpout'],
                                                               in_progress_status[
@@ -173,7 +230,8 @@ class ActionQueue(threading.Thread):
     # if graceful STOP fails (like force kill the processes)
     if command['roleCommand'] == 'STOP':
       self.controller.appGracefulStopTriggered = True
-
+    
+    commandresult[Constants.EXIT_CODE] = 0
     # dumping results
     status = self.COMPLETED_STATUS
     if commandresult[Constants.EXIT_CODE] != 0:
@@ -210,6 +268,8 @@ class ActionQueue(threading.Thread):
     return self.commandStatuses.generate_report()
 
   def execute_status_command(self, command):
+      
+    logger.info("aaa status command" + str(command))
     '''
     Executes commands of type STATUS_COMMAND
     '''
