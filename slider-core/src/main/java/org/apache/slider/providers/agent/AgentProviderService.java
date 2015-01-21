@@ -1607,6 +1607,7 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, String> dockerConfig = new HashMap<String, String>();
     //dockerConfig.put("image_name", "borja/docker-memcached");
     dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
+    dockerConfig.put("docker.container_port", appConf.getGlobalOptions().get("docker.container_port"));
     configurations.put("docker", dockerConfig);
 
     log.info("aaa configurationstop: " + appConf.getGlobalOptions().get("docker.image_name"));
@@ -1755,6 +1756,7 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, String> dockerConfig = new HashMap<String, String>();
     //dockerConfig.put("image_name", "borja/docker-memcached");
     dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
+    dockerConfig.put("docker.container_port", appConf.getGlobalOptions().get("docker.container_port"));
     configurations.put("docker", dockerConfig);
     
     cmd.setConfigurations(configurations);
@@ -1785,9 +1787,7 @@ public class AgentProviderService extends AbstractProviderService implements
         Boolean.toString(isMarkedAutoRestart));
 
     cmdStop.setCommandParams(setCommandParameters(scriptPath, timeout, true));
-    if(dockerMode){
-      cmdStop.getCommandParams().put("container_name", "tutum/memcached");
-    }
+    
 
     Map<String, Map<String, String>> configurationsStop = buildCommandConfigurations(
         appConf, containerId, componentName);

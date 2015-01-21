@@ -58,6 +58,7 @@ def _clean():
 
 def stopAgent():
   _clean()
+  
   os._exit(0)
   pass
 

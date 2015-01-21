@@ -36,11 +36,13 @@ from AgentConfig import AgentConfig
 from NetUtil import NetUtil
 from Registry import Registry
 import Constants
+import subprocess
 
 logger = logging.getLogger()
 IS_WINDOWS = platform.system() == "Windows"
 formatstr = "%(levelname)s %(asctime)s %(filename)s:%(lineno)d - %(message)s"
 agentPid = os.getpid()
+con = None
 
 configFileRelPath = "infra/conf/agent.ini"
 logFileName = "slider-agent.log"
@@ -54,6 +56,17 @@ def signal_handler(signum, frame):
   if os.getpid() != agentPid:
     os._exit(0)
   logger.info('signal received, exiting.')
+  
+  docker_command = ["/usr/bin/docker", "stop"]
+  tmpdir = con.actionQueue.get_tmpdir()
+  docker_command.append(tmpdir)
+  
+  proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
+  out = proc.communicate()
+  #out = subprocess.call(docker_command)
+  logger.info("docker stop: " + str(docker_command) + " out: ")
+  logger.info(out)
+  
   ProcessHelper.stopAgent()
 
 
@@ -288,6 +301,8 @@ def main():
   # Launch Controller communication
   controller = Controller(agentConfig)
   controller.start()
+  global con 
+  con = controller
   try:
     while controller.is_alive():
       controller.join(timeout=1.0)

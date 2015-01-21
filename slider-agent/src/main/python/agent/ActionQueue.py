@@ -38,7 +38,6 @@ import Constants
 logger = logging.getLogger()
 installScriptHash = -1
 
-
 class ActionQueue(threading.Thread):
   """ Action Queue for the agent. We pick one command at a time from the queue
   and execute it
@@ -53,6 +52,8 @@ class ActionQueue(threading.Thread):
 
   STORE_APPLIED_CONFIG = 'record_config'
   AUTO_RESTART = 'auto_restart'
+  
+  containerPort = ''
 
   def __init__(self, config, controller, agentToggleLogger):
     super(ActionQueue, self).__init__()
@@ -100,6 +101,8 @@ class ActionQueue(threading.Thread):
       self.queueOutAgentToggleLogger.adjustLogLevelAtEnd(command['commandType'])
     logger.info("ActionQueue stopped.")
 
+  def get_tmpdir(self):
+      return self.tmpdir[-30:-2]
 
   def process_command(self, command):
     logger.debug("Took an element of Queue: " + pprint.pformat(command))
@@ -162,52 +165,44 @@ class ActionQueue(threading.Thread):
     if store_command:
       logger.info("Component has indicated auto-restart. Saving details from START command.")
 
-    # running command
-    imageName = ''
-    containerPort = '11211'
     hostPort = '11211'
-    if 'roleParams' in command:
-        if 'imageName' in command:
-            imageName = command['roleParams']['imageName']
-        if 'containerPort' in command:
-            containerPort = command['roleParams']['containerPort']
         
-    
-    logger.info('allocatedPorts: ' + hostPort)
-    logger.info('image name: ' + imageName)
-    
-    logger.info("command fromhost: " + str(command))
-    
     if 'configurations' in command:
         logger.info(str( command['configurations']))
         if 'docker' in command['configurations']:
             logger.info(str( command['configurations']['docker']))
             if 'docker.image_name' in command['configurations']['docker']:
                 logger.info( command['configurations']['docker']['docker.image_name'])
-                imageName = command['configurations']['docker']['docker.image_name']
+                self.imageName = command['configurations']['docker']['docker.image_name']
+            if 'docker.container_port' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.container_port'])
+                self.containerPort = command['configurations']['docker']['docker.container_port']
+    
+    logger.info('containerPort: ' + self.containerPort)
+    logger.info('image name: ' + self.imageName)
+    logger.info("command fromhost: " + str(command))
     
     if command['roleCommand'] == 'INSTALL':
-        docker_command = ["/usr/bin/docker", "pull", imageName]
+        docker_command = ["/usr/bin/docker", "pull", self.imageName]
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
         out = proc.communicate()
         #out = subprocess.call(docker_command)
         logger.info("docker install: " + str(docker_command))
         logger.info(str(out))
         
-    #if command['roleCommand'] == 'START':
+    if command['roleCommand'] == 'START':
         docker_command = ["/usr/bin/docker", "run", "-d", "-p"]
-        docker_command.append(hostPort+":"+containerPort)
-        docker_command.append("-v")
-        docker_command.append("/vagrant")
+        docker_command.append(hostPort+":"+self.containerPort)
+        #docker_command.append("-v")
+        #docker_command.append("/vagrant")
         docker_command.append("-name")
-        docker_command.append( "docker_try")
-        docker_command.append(imageName)
+        docker_command.append(self.get_tmpdir())
+        docker_command.append(self.imageName)
         
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
         out = proc.communicate()
         #out = subprocess.call(docker_command)
         logger.info("docker run" + str(docker_command))
-        logger.info(str(out))
         """
         docker_command = ["/usr/bin/docker", "exec", "-d", "docker_try", "ls", "/vagrant"]
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
@@ -216,6 +211,7 @@ class ActionQueue(threading.Thread):
         logger.info("docker run2" + str(docker_command))
         logger.info(str(out))
         """
+    """
     commandresult = self.customServiceOrchestrator.runCommand(command,
                                                               
                                                               
@@ -225,13 +221,13 @@ class ActionQueue(threading.Thread):
                                                                 'tmperr'],
                                                               True,
                                                               store_config or store_command)
+    """
     # If command is STOP then set flag to indicate stop has been triggered.
     # In future we might check status of STOP command and take other measures
     # if graceful STOP fails (like force kill the processes)
-    if command['roleCommand'] == 'STOP':
-      self.controller.appGracefulStopTriggered = True
     
-    commandresult[Constants.EXIT_CODE] = 0
+    commandresult = {Constants.EXIT_CODE:0, 'stdout':'', 'stderr':''}
+    
     # dumping results
     status = self.COMPLETED_STATUS
     if commandresult[Constants.EXIT_CODE] != 0:

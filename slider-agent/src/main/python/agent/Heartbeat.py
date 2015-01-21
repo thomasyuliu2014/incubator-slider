@@ -100,7 +100,7 @@ class Heartbeat:
                  ". Command(s) in progress: " + repr(commandsInProgress) +
                  ". Components mapped: " + repr(componentsMapped))
     logger.debug("Heartbeat : " + pformat(heartbeat))
-
+    commandResult["commandStatus"] = ActionQueue.COMPLETED_STATUS
     return heartbeat
 
 
