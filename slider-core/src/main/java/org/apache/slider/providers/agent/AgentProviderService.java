@@ -321,11 +321,6 @@ public class AgentProviderService extends AbstractProviderService implements
     // for 2-Way SSL
     launcher.setEnv(SLIDER_PASSPHRASE, instanceDefinition.getPassphrase());
 
-    // if we launch application docker container instead of application process
-    if(dockerMode){
-      launcher.setEnv(DOCKER_MODE, "True");
-      this.dockerMode = true;
-    }
 
     //local resources
 
@@ -666,13 +661,14 @@ public class AgentProviderService extends AbstractProviderService implements
     StateAccessForProviders accessor = getAmState();
     CommandScript cmdScript = getScriptPathFromMetainfo(roleName);
 
+    /*
     if (cmdScript == null || cmdScript.getScript() == null) {
       log.error("role.script is unavailable for " + roleName + ". Commands will not be sent.");
       return response;
     }
-
-    String scriptPath = cmdScript.getScript();
-    long timeout = cmdScript.getTimeout();
+  */
+    String scriptPath = "cmdScript";//cmdScript.getScript();
+    long timeout = 700;//cmdScript.getTimeout();
 
     if (timeout == 0L) {
       timeout = 600L;

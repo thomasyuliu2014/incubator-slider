@@ -89,7 +89,9 @@ public class AgentClientProvider extends AbstractClientProvider
                                                 instanceDefinition,
                                                 clusterDirPath,
                                                 generatedConfDirPath, secure);
-
+    String desDef = clusterDirPath.toString();
+    instanceDefinition.getAppConfOperations().getGlobalOptions().put(AgentKeys.APP_DEF, desDef);
+    
     String appDef = instanceDefinition.getAppConfOperations().
         getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
     Path appDefPath = new Path(appDef);

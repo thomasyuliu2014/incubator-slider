@@ -23,6 +23,7 @@ import com.codahale.metrics.health.HealthCheckRegistry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
@@ -405,7 +406,7 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
     serviceArgs.applyDefinitions(customConf);
     serviceArgs.applyFileSystemBinding(customConf);
     // conf now contains all customizations
-
+    
     AbstractActionArgs action = serviceArgs.getCoreAction();
     SliderAMCreateAction createAction = (SliderAMCreateAction) action;
 
@@ -570,6 +571,7 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
     log.info("Application defined at {}", sliderClusterURI);
     SliderFileSystem fs = getClusterFS();
 
+    
     // build up information about the running application -this
     // will be passed down to the cluster status
     MapOperations appInformation = new MapOperations(); 
@@ -577,7 +579,9 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
     AggregateConf instanceDefinition =
       InstanceIO.loadInstanceDefinitionUnresolved(fs, clusterDirPath);
     instanceDefinition.setName(clustername);
-
+    String desDef = clusterDirPath.toString() + "myapp.zip";
+    instanceDefinition.getAppConfOperations().getGlobalOptions().put(AgentKeys.APP_DEF, desDef);
+    
     log.info("Deploying cluster {}:", instanceDefinition);
 
     stateForProviders.setApplicationName(clustername);

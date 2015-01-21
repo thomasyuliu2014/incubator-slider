@@ -633,8 +633,8 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
         clustername, clusterDirectory);
     log.info("cluster dir: " + clusterDirectory.toString());
 
-    String desDef = clusterDirectory.toString();
-    instanceDefinition.getAppConfOperations().getGlobalOptions().put(AgentKeys.APP_DEF, desDef);
+    String desDef = clusterDirectory.toString() + "myapp.zip";
+    //instanceDefinition.getAppConfOperations().getGlobalOptions().put(AgentKeys.APP_DEF, desDef);
     String srcDef = "/tmp/myapp.zip";
     Path desPath = new Path(desDef);
     Path srcPath = new Path(srcDef);
