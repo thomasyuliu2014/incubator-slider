@@ -93,7 +93,7 @@ public class AgentClientProvider extends AbstractClientProvider
     String appDef = instanceDefinition.getAppConfOperations().
         getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
     Path appDefPath = new Path(appDef);
-    sliderFileSystem.verifyFileExists(appDefPath);
+    //sliderFileSystem.verifyFileExists(appDefPath);
 
     String agentConf = instanceDefinition.getAppConfOperations().
         getGlobalOptions().getOption(AgentKeys.AGENT_CONF, "");

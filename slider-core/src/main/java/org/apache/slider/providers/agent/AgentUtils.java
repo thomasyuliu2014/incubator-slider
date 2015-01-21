@@ -37,9 +37,13 @@ import java.io.InputStream;
  */
 public class AgentUtils {
   private static final Logger log = LoggerFactory.getLogger(AgentUtils.class);
+  //private static Metainfo meta = null;
 
   public static Metainfo getApplicationMetainfo(SliderFileSystem fileSystem,
                                                 String appDef) throws IOException {
+    //if(meta != null){
+    //  return meta;
+    //}
     log.info("Reading metainfo at {}", appDef);
     FileSystem fs = fileSystem.getFileSystem();
     Path appPath = new Path(appDef);
@@ -54,6 +58,7 @@ public class AgentUtils {
     }
 
     Metainfo metainfo = new MetainfoParser().parse(metainfoStream);
+    //meta = metainfo;
 
     return metainfo;
   }

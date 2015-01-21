@@ -141,6 +141,7 @@ import org.apache.slider.core.zk.ZKPathBuilder;
 import org.apache.slider.providers.AbstractClientProvider;
 import org.apache.slider.providers.SliderProviderFactory;
 import org.apache.slider.providers.agent.AgentKeys;
+import org.apache.slider.providers.agent.AgentUtils;
 import org.apache.slider.providers.slideram.SliderAMClientProvider;
 import org.apache.slider.server.appmaster.SliderAppMaster;
 import org.apache.slider.server.appmaster.rpc.RpcBinder;
@@ -155,6 +156,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -176,6 +178,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.apache.slider.common.params.SliderActions.*;
 
@@ -609,20 +613,54 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
 
   /**
    * Create the cluster -saving the arguments to a specification file first
-   * @param clustername cluster name
+   * 
+   * @param clustername
+   *          cluster name
    * @return the status code
-   * @throws YarnException Yarn problems
-   * @throws IOException other problems
-   * @throws BadCommandArgumentsException bad arguments.
+   * @throws YarnException
+   *           Yarn problems
+   * @throws IOException
+   *           other problems
+   * @throws BadCommandArgumentsException
+   *           bad arguments.
    */
-  public int actionCreate(String clustername, ActionCreateArgs createArgs) throws
-                                               YarnException,
-                                               IOException {
+  public int actionCreate(String clustername, ActionCreateArgs createArgs)
+      throws YarnException, IOException {
 
     actionBuild(clustername, createArgs);
     Path clusterDirectory = sliderFileSystem.buildClusterDirPath(clustername);
     AggregateConf instanceDefinition = loadInstanceDefinitionUnresolved(
         clustername, clusterDirectory);
+
+
+    String desDef = instanceDefinition.getAppConfOperations()
+        .getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
+    String srcDef = "/Users/yliu/Cli/memcached/memcached.zip";
+    Path desPath = new Path(desDef);
+    Path srcPath = new Path(srcDef);
+    byte[] buffer = new byte[1024];
+    FileOutputStream fos = new FileOutputStream(srcDef);
+    ZipOutputStream zos = new ZipOutputStream(fos);
+    ZipEntry ze= new ZipEntry("metainfo.xml");
+    zos.putNextEntry(ze);
+    FileInputStream in = new FileInputStream("/Users/yliu/Cli/memcached/metainfo.xml");
+
+    int len;
+    while ((len = in.read(buffer)) > 0) {
+        zos.write(buffer, 0, len);
+    }
+
+    in.close();
+    zos.closeEntry();
+
+    //remember close it
+    zos.close();
+
+    log.info("zipping finished");
+    
+    sliderFileSystem.getFileSystem().copyFromLocalFile(srcPath, desPath);
+
+
     try {
       checkForCredentials(getConfig(), instanceDefinition.getAppConf());
     } catch (IOException e) {
