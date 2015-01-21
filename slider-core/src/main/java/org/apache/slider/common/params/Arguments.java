@@ -43,7 +43,7 @@ public interface Arguments {
   String ARG_DEST = "--dest";
   String ARG_DESTDIR = "--destdir";
   String ARG_DESTFILE = "--destfile";
-  String ARG_DOCKER = "--docker";
+  String ARG_METAINFO = "--metainfo";
   String ARG_EXITCODE = "--exitcode";
   /**
    filesystem-uri: {@value}

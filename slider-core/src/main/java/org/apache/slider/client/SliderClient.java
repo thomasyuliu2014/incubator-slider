@@ -631,11 +631,11 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     Path clusterDirectory = sliderFileSystem.buildClusterDirPath(clustername);
     AggregateConf instanceDefinition = loadInstanceDefinitionUnresolved(
         clustername, clusterDirectory);
+    log.info("cluster dir: " + clusterDirectory.toString());
 
-
-    String desDef = instanceDefinition.getAppConfOperations()
-        .getGlobalOptions().getMandatoryOption(AgentKeys.APP_DEF);
-    String srcDef = "/Users/yliu/Cli/memcached/memcached.zip";
+    String desDef = clusterDirectory.toString();
+    instanceDefinition.getAppConfOperations().getGlobalOptions().put(AgentKeys.APP_DEF, desDef);
+    String srcDef = "/tmp/myapp.zip";
     Path desPath = new Path(desDef);
     Path srcPath = new Path(srcDef);
     byte[] buffer = new byte[1024];
@@ -643,8 +643,9 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     ZipOutputStream zos = new ZipOutputStream(fos);
     ZipEntry ze= new ZipEntry("metainfo.xml");
     zos.putNextEntry(ze);
-    FileInputStream in = new FileInputStream("/Users/yliu/Cli/memcached/metainfo.xml");
-
+    //FileInputStream in = new FileInputStream("/Users/yliu/Cli/memcached/metainfo.xml");
+    FileInputStream in = new FileInputStream(createArgs.metainfoPath);
+    
     int len;
     while ((len = in.read(buffer)) > 0) {
         zos.write(buffer, 0, len);
