@@ -1604,6 +1604,7 @@ public class AgentProviderService extends AbstractProviderService implements
     //dockerConfig.put("image_name", "borja/docker-memcached");
     dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
     dockerConfig.put("docker.container_port", appConf.getGlobalOptions().get("docker.container_port"));
+    dockerConfig.put("docker.host_port", appConf.getGlobalOptions().get("docker.host_port"));
     configurations.put("docker", dockerConfig);
 
     log.info("aaa configurationstop: " + appConf.getGlobalOptions().get("docker.image_name"));
@@ -1681,6 +1682,10 @@ public class AgentProviderService extends AbstractProviderService implements
 
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
+    Map<String, String> dockerConfig = new HashMap<String, String>();
+    dockerConfig.put("docker.status_command", appConf.getGlobalOptions().get("docker.status_command"));
+    configurations.put("docker", dockerConfig);
+    
     cmd.setConfigurations(configurations);
     
     log.info("aaa status configuration" + configurations.toString());
@@ -1753,6 +1758,8 @@ public class AgentProviderService extends AbstractProviderService implements
     //dockerConfig.put("image_name", "borja/docker-memcached");
     dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
     dockerConfig.put("docker.container_port", appConf.getGlobalOptions().get("docker.container_port"));
+    dockerConfig.put("docker.host_port", appConf.getGlobalOptions().get("docker.host_port"));
+    dockerConfig.put("docker.additional_param", appConf.getGlobalOptions().get("docker.additional_param"));
     configurations.put("docker", dockerConfig);
     
     cmd.setConfigurations(configurations);

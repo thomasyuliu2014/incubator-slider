@@ -54,6 +54,8 @@ class ActionQueue(threading.Thread):
   AUTO_RESTART = 'auto_restart'
   
   containerPort = ''
+  hostPort = ''
+  additional_param = ''
 
   def __init__(self, config, controller, agentToggleLogger):
     super(ActionQueue, self).__init__()
@@ -165,8 +167,6 @@ class ActionQueue(threading.Thread):
     if store_command:
       logger.info("Component has indicated auto-restart. Saving details from START command.")
 
-    hostPort = '11211'
-        
     if 'configurations' in command:
         logger.info(str( command['configurations']))
         if 'docker' in command['configurations']:
@@ -177,8 +177,15 @@ class ActionQueue(threading.Thread):
             if 'docker.container_port' in command['configurations']['docker']:
                 logger.info( command['configurations']['docker']['docker.container_port'])
                 self.containerPort = command['configurations']['docker']['docker.container_port']
+            if 'docker.host_port' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.host_port'])
+                self.hostPort = command['configurations']['docker']['docker.host_port']
+            if 'docker.additional_param' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.additional_param'])
+                self.additional_param = command['configurations']['docker']['docker.additional_param']
     
     logger.info('containerPort: ' + self.containerPort)
+    logger.info('hostPort: ' + self.hostPort)
     logger.info('image name: ' + self.imageName)
     logger.info("command fromhost: " + str(command))
     
@@ -192,12 +199,15 @@ class ActionQueue(threading.Thread):
         
     if command['roleCommand'] == 'START':
         docker_command = ["/usr/bin/docker", "run", "-d", "-p"]
-        docker_command.append(hostPort+":"+self.containerPort)
+        docker_command.append(self.hostPort+":"+self.containerPort)
         #docker_command.append("-v")
         #docker_command.append("/vagrant")
         docker_command.append("-name")
         docker_command.append(self.get_tmpdir())
         docker_command.append(self.imageName)
+        
+        if self.additional_param:
+            docker_command = docker_command + self.additional_param.split(" ")
         
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
         out = proc.communicate()
@@ -264,8 +274,26 @@ class ActionQueue(threading.Thread):
     return self.commandStatuses.generate_report()
 
   def execute_status_command(self, command):
-      
+    status_command = ''
+    if 'configurations' in command:
+        logger.info(str( command['configurations']))
+        if 'docker' in command['configurations']:
+            logger.info(str( command['configurations']['docker']))
+            if 'docker.status_command' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.status_command'])
+                status_command = command['configurations']['docker']['docker.status_command']
+                
     logger.info("aaa status command" + str(command))
+    docker_command = ["/usr/bin/docker", "exec"]
+    docker_command.append(self.get_tmpdir())
+    docker_command.append(status_command)
+    
+    '''
+    proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
+    out = proc.communicate()
+    logger.info("docker exec" + str(docker_command))
+    '''
+    
     '''
     Executes commands of type STATUS_COMMAND
     '''
