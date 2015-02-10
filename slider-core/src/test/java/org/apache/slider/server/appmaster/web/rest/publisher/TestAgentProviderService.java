@@ -32,8 +32,8 @@ import java.util.Map;
  *
  */
 public class TestAgentProviderService extends AgentProviderService {
-  protected static final Logger log =
-      LoggerFactory.getLogger(TestAgentProviderService.class);
+  protected static final Logger log = LoggerFactory
+      .getLogger(TestAgentProviderService.class);
 
   public TestAgentProviderService() {
     super();
@@ -42,19 +42,17 @@ public class TestAgentProviderService extends AgentProviderService {
 
   @Override
   public void bind(StateAccessForProviders stateAccessor,
-      QueueAccess queueAccess,
-      List<Container> liveContainers) {
+      QueueAccess queueAccess, List<Container> liveContainers) {
     super.bind(stateAccessor, queueAccess, liveContainers);
-    Map<String,String> dummyProps = new HashMap<String, String>();
+    Map<String, String> dummyProps = new HashMap<String, String>();
     dummyProps.put("prop1", "val1");
     dummyProps.put("prop2", "val2");
     log.info("publishing dummy-site.xml with values {}", dummyProps);
     publishApplicationInstanceData("dummy-site", "dummy configuration",
-                                   dummyProps.entrySet());
+        dummyProps.entrySet());
     // publishing global config for testing purposes
     publishApplicationInstanceData("global", "global configuration",
-                                   stateAccessor.getAppConfSnapshot()
-                                       .getGlobalOptions().entrySet());
+        stateAccessor.getAppConfSnapshot().getGlobalOptions().entrySet());
   }
 
 }

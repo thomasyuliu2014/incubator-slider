@@ -53,8 +53,13 @@ class ActionQueue(threading.Thread):
   STORE_APPLIED_CONFIG = 'record_config'
   AUTO_RESTART = 'auto_restart'
   
-  containerPort = ''
+  command_path = ''
+  imageName = ''
+  options = ''
   hostPort = ''
+  containerPort = ''
+  mounting_directory = ''
+  start_command = ''
   additional_param = ''
 
   def __init__(self, config, controller, agentToggleLogger):
@@ -136,10 +141,6 @@ class ActionQueue(threading.Thread):
               "cluster {cluster}".format(
       commandId=str(commandId), role=command['role'],
       cluster=clusterName)
-    logger.info(message)
-    logger.debug(pprint.pformat(command))
-    logger.info("username")
-    logger.info(getpass.getuser())
     taskId = command['taskId']
 
     # if auto generated then do not report result
@@ -163,7 +164,8 @@ class ActionQueue(threading.Thread):
     store_command = False
     if 'roleParams' in command and ActionQueue.AUTO_RESTART in command['roleParams']:
       store_command = 'true' == command['roleParams'][ActionQueue.AUTO_RESTART]
-
+    logger.info("command fromhost: " + str(command))
+    
     if store_command:
       logger.info("Component has indicated auto-restart. Saving details from START command.")
 
@@ -171,56 +173,59 @@ class ActionQueue(threading.Thread):
         logger.info(str( command['configurations']))
         if 'docker' in command['configurations']:
             logger.info(str( command['configurations']['docker']))
+            if 'docker.command_path' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.command_path'])
+                self.command_path = command['configurations']['docker']['docker.command_path']
             if 'docker.image_name' in command['configurations']['docker']:
                 logger.info( command['configurations']['docker']['docker.image_name'])
                 self.imageName = command['configurations']['docker']['docker.image_name']
+            if 'docker.options' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.options'])
+                self.options = command['configurations']['docker']['docker.options']
             if 'docker.container_port' in command['configurations']['docker']:
                 logger.info( command['configurations']['docker']['docker.container_port'])
                 self.containerPort = command['configurations']['docker']['docker.container_port']
-            if 'docker.host_port' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.host_port'])
-                self.hostPort = command['configurations']['docker']['docker.host_port']
+            if 'docker.mounting_directory' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.mounting_directory'])
+                self.mounting_directory = command['configurations']['docker']['docker.mounting_directory']
+            if 'docker.start_command' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.start_command'])
+                self.start_command = command['configurations']['docker']['docker.start_command']
             if 'docker.additional_param' in command['configurations']['docker']:
                 logger.info( command['configurations']['docker']['docker.additional_param'])
                 self.additional_param = command['configurations']['docker']['docker.additional_param']
-    
-    logger.info('containerPort: ' + self.containerPort)
-    logger.info('hostPort: ' + self.hostPort)
-    logger.info('image name: ' + self.imageName)
-    logger.info("command fromhost: " + str(command))
-    
+        
     if command['roleCommand'] == 'INSTALL':
         docker_command = ["/usr/bin/docker", "pull", self.imageName]
+        logger.info("docker install: " + str(docker_command))
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
         out = proc.communicate()
-        #out = subprocess.call(docker_command)
-        logger.info("docker install: " + str(docker_command))
         logger.info(str(out))
         
     if command['roleCommand'] == 'START':
-        docker_command = ["/usr/bin/docker", "run", "-d", "-p"]
-        docker_command.append(self.hostPort+":"+self.containerPort)
-        #docker_command.append("-v")
-        #docker_command.append("/vagrant")
+        docker_command = [self.command_path, "run"]
+        if self.options:
+            docker_command = docker_command + self.options.split(" ")
+        if self.containerPort:
+            docker_command.append("-p")
+            self.hostPort = '11911'
+            docker_command.append(self.hostPort+":"+self.containerPort)
+        if self.mounting_directory:
+            docker_command.append("-v")
+            docker_command.append(self.tmpdir+":"+self.mounting_directory)
         docker_command.append("-name")
         docker_command.append(self.get_tmpdir())
         docker_command.append(self.imageName)
-        
+        if self.start_command:
+            docker_command.append(self.start_command)
         if self.additional_param:
             docker_command = docker_command + self.additional_param.split(" ")
+        logger.info("docker run" + str(docker_command))
         
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
         out = proc.communicate()
-        #out = subprocess.call(docker_command)
-        logger.info("docker run" + str(docker_command))
-        """
-        docker_command = ["/usr/bin/docker", "exec", "-d", "docker_try", "ls", "/vagrant"]
-        proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-        out = proc.communicate()
-        #out = subprocess.call(docker_command)
-        logger.info("docker run2" + str(docker_command))
         logger.info(str(out))
-        """
+        
     """
     commandresult = self.customServiceOrchestrator.runCommand(command,
                                                               
