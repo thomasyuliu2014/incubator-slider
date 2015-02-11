@@ -351,6 +351,8 @@ public class AgentProviderService extends AbstractProviderService implements
     } else {
        agentImagePath = new Path(agentImage);
     }
+    
+    log.info("agentimagepath: " + agentImagePath.toString());
 
     // TODO: throw exception when agent tarball is not available
 
@@ -388,6 +390,8 @@ public class AgentProviderService extends AbstractProviderService implements
     if (SliderUtils.isHadoopClusterSecure(getConfig())) {
       localizeServiceKeytabs(launcher, instanceDefinition, fileSystem);
     }
+    
+    localizeDockerInputFiles(launcher, instanceDefinition, fileSystem);
 
     MapOperations amComponent = instanceDefinition.
         getAppConfOperations().getComponent(SliderKeys.COMPONENT_AM);
@@ -507,6 +511,20 @@ public class AgentProviderService extends AbstractProviderService implements
       new FsPermission(FsAction.READ, FsAction.NONE, FsAction.NONE));
 
     return destPath;
+  }
+
+  private void localizeDockerInputFiles(ContainerLauncher launcher,
+                                      AggregateConf instanceDefinition,
+                                      SliderFileSystem fileSystem)
+      throws IOException {
+      Path cluUrl = fileSystem.buildClusterDirPath(getClusterName());
+      
+      log.info("dockerinputfile:" + new Path(cluUrl.toString() + "/inputDir/input.txt").toString());
+      
+      LocalResource inputFileRes = fileSystem.createAmResource(new Path(cluUrl.toString() + "/inputDir/input.txt"), LocalResourceType.FILE);
+      launcher.addLocalResource("inputDir/input.txt",
+                                  inputFileRes);
+        
   }
 
   private void localizeServiceKeytabs(ContainerLauncher launcher,
@@ -1760,6 +1778,8 @@ public class AgentProviderService extends AbstractProviderService implements
     dockerConfig.put("docker.mounting_directory", appConf.getGlobalOptions().get("docker.mounting_directory"));
     dockerConfig.put("docker.start_command", appConf.getGlobalOptions().get("docker.start_command"));
     dockerConfig.put("docker.additional_param", appConf.getGlobalOptions().get("docker.additional_param"));
+    dockerConfig.put("docker.input_file.local_path", appConf.getGlobalOptions().get("docker.input_file.local_path"));
+    dockerConfig.put("docker.input_file.mount_path", appConf.getGlobalOptions().get("docker.input_file.mount_path"));
     configurations.put("docker", dockerConfig);
     
     cmd.setConfigurations(configurations);

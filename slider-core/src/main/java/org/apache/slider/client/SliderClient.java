@@ -633,35 +633,41 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
         clustername, clusterDirectory);
     log.info("cluster dir: " + clusterDirectory.toString());
 
+    // zip metainfo.xml and upload it to HDFS
+    FileOutputStream fos = null;
+    ZipOutputStream zos = null;
+    FileInputStream in = null;
     String desDef = clusterDirectory.toString() + "myapp.zip";
-    //instanceDefinition.getAppConfOperations().getGlobalOptions().put(AgentKeys.APP_DEF, desDef);
     String srcDef = "/tmp/myapp.zip";
     Path desPath = new Path(desDef);
     Path srcPath = new Path(srcDef);
-    byte[] buffer = new byte[1024];
-    FileOutputStream fos = new FileOutputStream(srcDef);
-    ZipOutputStream zos = new ZipOutputStream(fos);
-    ZipEntry ze= new ZipEntry("metainfo.xml");
-    zos.putNextEntry(ze);
-    //FileInputStream in = new FileInputStream("/Users/yliu/Cli/memcached/metainfo.xml");
-    FileInputStream in = new FileInputStream(createArgs.metainfoPath);
-    
-    int len;
-    while ((len = in.read(buffer)) > 0) {
+    try {
+       byte[] buffer = new byte[1024];
+      fos = new FileOutputStream(srcDef);
+      zos = new ZipOutputStream(fos);
+      ZipEntry ze = new ZipEntry("metainfo.xml");
+      zos.putNextEntry(ze);
+      in = new FileInputStream(createArgs.metainfoPath);
+
+      int len;
+      while ((len = in.read(buffer)) > 0) {
         zos.write(buffer, 0, len);
+      }
+      
+    } finally {
+      in.close();
+      zos.closeEntry();
+      zos.close();
+      fos.close();
     }
-
-    in.close();
-    zos.closeEntry();
-
-    //remember close it
-    zos.close();
-
-    log.info("zipping finished");
-    
     sliderFileSystem.getFileSystem().copyFromLocalFile(srcPath, desPath);
-
-
+    
+    //copy docker input file to HDFS
+    String dockerinputfilepathurl = instanceDefinition.getAppConfOperations().getGlobalOptions().get("docker.input_file.local_path");
+    Path src = new Path(dockerinputfilepathurl);
+    Path dst = new Path(clusterDirectory.toString() + "/inputDir/input.txt");
+    sliderFileSystem.getFileSystem().copyFromLocalFile(src, dst);
+    
     try {
       checkForCredentials(getConfig(), instanceDefinition.getAppConf());
     } catch (IOException e) {

@@ -61,6 +61,8 @@ class ActionQueue(threading.Thread):
   mounting_directory = ''
   start_command = ''
   additional_param = ''
+  input_file_local_path = ''
+  input_file_mount_path = ''
 
   def __init__(self, config, controller, agentToggleLogger):
     super(ActionQueue, self).__init__()
@@ -194,7 +196,13 @@ class ActionQueue(threading.Thread):
             if 'docker.additional_param' in command['configurations']['docker']:
                 logger.info( command['configurations']['docker']['docker.additional_param'])
                 self.additional_param = command['configurations']['docker']['docker.additional_param']
-        
+            if 'docker.input_file.local_path' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.input_file.local_path'])
+                self.input_file_local_path = command['configurations']['docker']['docker.input_file.local_path']
+            if 'docker.input_file.mount_path' in command['configurations']['docker']:
+                logger.info( command['configurations']['docker']['docker.input_file.mount_path'])
+                self.input_file_mount_path = command['configurations']['docker']['docker.input_file.mount_path']
+    
     if command['roleCommand'] == 'INSTALL':
         docker_command = ["/usr/bin/docker", "pull", self.imageName]
         logger.info("docker install: " + str(docker_command))
@@ -212,7 +220,12 @@ class ActionQueue(threading.Thread):
             docker_command.append(self.hostPort+":"+self.containerPort)
         if self.mounting_directory:
             docker_command.append("-v")
-            docker_command.append(self.tmpdir+":"+self.mounting_directory)
+            tmp_mount_dir = self.config.getWorkRootPath()+ "/docker_use"
+            docker_command.append(tmp_mount_dir+":"+self.mounting_directory)
+        if self.input_file_local_path:
+            docker_command.append("-v")
+            localized_input = self.config.getWorkRootPath() + "/inputDir/"
+            docker_command.append(localized_input+":"+self.input_file_mount_path)
         docker_command.append("-name")
         docker_command.append(self.get_tmpdir())
         docker_command.append(self.imageName)

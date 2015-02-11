@@ -165,6 +165,25 @@ public class CoreFileSystem {
   }
 
   /**
+   * Build up the path string for dockerInputFile -no attempt to
+   * create the directory is made
+   *
+   * @return the path for dockerInputFile installation location
+   */
+  public Path buildDockerInputFilePath(String dockerInputFile, String inputFileName, String clusterName) {
+    Path homePath = getHomeDirectory();
+    Path baseKeytabDir;
+    if (dockerInputFile != null) {
+      baseKeytabDir = new Path(homePath, dockerInputFile);
+    } else {
+      baseKeytabDir = new Path(buildClusterDirPath(clusterName),
+                               SliderKeys.KEYTAB_DIR);
+    }
+    return inputFileName == null ? baseKeytabDir :
+        new Path(baseKeytabDir, inputFileName);
+  }
+
+  /**
    * Create the Slider cluster path for a named cluster and all its subdirs
    * This is a directory; a mkdirs() operation is executed
    * to ensure that it is there.

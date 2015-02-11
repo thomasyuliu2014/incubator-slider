@@ -112,8 +112,6 @@ class AgentConfig:
 
   AUTO_RESTART = "auto_restart"
   
-  DOCKER_CONTAINER = "docker_container_name"
-
   FOLDER_MAPPING = {
     APP_PACKAGE_DIR: "WORK",
     APP_INSTALL_DIR: "WORK",
