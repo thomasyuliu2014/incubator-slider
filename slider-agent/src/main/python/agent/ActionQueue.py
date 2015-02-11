@@ -52,7 +52,7 @@ class ActionQueue(threading.Thread):
 
   STORE_APPLIED_CONFIG = 'record_config'
   AUTO_RESTART = 'auto_restart'
-  
+  '''
   command_path = ''
   imageName = ''
   options = ''
@@ -63,6 +63,7 @@ class ActionQueue(threading.Thread):
   additional_param = ''
   input_file_local_path = ''
   input_file_mount_path = ''
+  '''
 
   def __init__(self, config, controller, agentToggleLogger):
     super(ActionQueue, self).__init__()
@@ -74,7 +75,7 @@ class ActionQueue(threading.Thread):
     self.config = config
     self.controller = controller
     self._stop = threading.Event()
-    self.tmpdir = config.getResolvedPath(AgentConfig.APP_TASK_DIR)
+    self.dockerManager = DockerManager(config.getResolvedPath(AgentConfig.APP_TASK_DIR))
     self.customServiceOrchestrator = CustomServiceOrchestrator(config,
                                                                controller,
                                                                self.queueOutAgentToggleLogger)
@@ -109,9 +110,6 @@ class ActionQueue(threading.Thread):
       self.process_command(command)
       self.queueOutAgentToggleLogger.adjustLogLevelAtEnd(command['commandType'])
     logger.info("ActionQueue stopped.")
-
-  def get_tmpdir(self):
-      return self.tmpdir[-30:-2]
 
   def process_command(self, command):
     logger.debug("Took an element of Queue: " + pprint.pformat(command))
@@ -170,7 +168,8 @@ class ActionQueue(threading.Thread):
     
     if store_command:
       logger.info("Component has indicated auto-restart. Saving details from START command.")
-
+        
+    '''
     if 'configurations' in command:
         logger.info(str( command['configurations']))
         if 'docker' in command['configurations']:
@@ -238,23 +237,24 @@ class ActionQueue(threading.Thread):
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
         out = proc.communicate()
         logger.info(str(out))
-        
-    """
-    commandresult = self.customServiceOrchestrator.runCommand(command,
-                                                              
-                                                              
+    '''
+    commandresult = None
+    
+    if 'configurations' in command:
+        if 'docker' in command['configurations']:
+            commandresult = self.dockerManager.execute_command(command)
+    else:
+        commandresult = self.customServiceOrchestrator.runCommand(command,
                                                               in_progress_status[
                                                                 'tmpout'],
                                                               in_progress_status[
                                                                 'tmperr'],
                                                               True,
                                                               store_config or store_command)
-    """
+    
     # If command is STOP then set flag to indicate stop has been triggered.
     # In future we might check status of STOP command and take other measures
     # if graceful STOP fails (like force kill the processes)
-    
-    commandresult = {Constants.EXIT_CODE:0, 'stdout':'', 'stderr':''}
     
     # dumping results
     status = self.COMPLETED_STATUS
@@ -292,6 +292,7 @@ class ActionQueue(threading.Thread):
     return self.commandStatuses.generate_report()
 
   def execute_status_command(self, command):
+    '''
     status_command = ''
     if 'configurations' in command:
         logger.info(str( command['configurations']))
@@ -306,7 +307,7 @@ class ActionQueue(threading.Thread):
     docker_command.append(self.get_tmpdir())
     docker_command.append(status_command)
     
-    '''
+    
     proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
     out = proc.communicate()
     logger.info("docker exec" + str(docker_command))
@@ -320,7 +321,12 @@ class ActionQueue(threading.Thread):
       service = command['serviceName']
       component = command['componentName']
       reportResult = CommandStatusDict.shouldReportResult(command)
-      component_status = self.customServiceOrchestrator.requestComponentStatus(command)
+      component_status = None
+      if 'configurations' in command:
+        if 'docker' in command['configurations']:
+            component_status = self.dockerManager.query_status(command)
+      else:
+        component_status = self.customServiceOrchestrator.requestComponentStatus(command)
 
       result = {"componentName": component,
                 "msg": "",

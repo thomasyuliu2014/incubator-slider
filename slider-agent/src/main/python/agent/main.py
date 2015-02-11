@@ -58,7 +58,7 @@ def signal_handler(signum, frame):
   logger.info('signal received, exiting.')
   
   docker_command = ["/usr/bin/docker", "stop"]
-  tmpdir = con.actionQueue.get_tmpdir()
+  tmpdir = con.actionQueue.dockerManager.get_container_id()
   docker_command.append(tmpdir)
   
   proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
