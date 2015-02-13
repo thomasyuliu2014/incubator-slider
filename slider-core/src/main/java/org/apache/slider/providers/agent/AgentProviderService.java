@@ -1619,7 +1619,7 @@ public class AgentProviderService extends AbstractProviderService implements
     cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
     
     Map<String, String> dockerConfig = new HashMap<String, String>();
-    //dockerConfig.put("image_name", "borja/docker-memcached");
+    dockerConfig.put("docker.command_path", appConf.getGlobalOptions().get("docker.command_path"));
     dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
     configurations.put("docker", dockerConfig);
 
@@ -1729,6 +1729,14 @@ public class AgentProviderService extends AbstractProviderService implements
 
     hostLevelParams.put(CONTAINER_ID, containerId);
 
+    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+    Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+    Map<String, String> dockerConfig = new HashMap<String, String>();
+    dockerConfig.put("docker.status_command", appConf.getGlobalOptions().get("docker.status_command"));
+    configurations.put("docker", dockerConfig);
+    
+    cmd.setConfigurations(configurations);
+    
     log.info("aaa getconfig param " + hostLevelParams.toString());
     log.info("aaa getconfig command " + cmd);
     

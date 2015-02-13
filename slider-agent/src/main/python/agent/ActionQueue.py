@@ -27,6 +27,7 @@ import os
 import time
 import subprocess
 import getpass
+from DockerManager import DockerManager
 
 from AgentConfig import AgentConfig
 from AgentToggleLogger import AgentToggleLogger
@@ -75,7 +76,8 @@ class ActionQueue(threading.Thread):
     self.config = config
     self.controller = controller
     self._stop = threading.Event()
-    self.dockerManager = DockerManager(config.getResolvedPath(AgentConfig.APP_TASK_DIR))
+    self.tmpdir = config.getResolvedPath(AgentConfig.APP_TASK_DIR)
+    self.dockerManager = DockerManager(self.tmpdir, config.getWorkRootPath())
     self.customServiceOrchestrator = CustomServiceOrchestrator(config,
                                                                controller,
                                                                self.queueOutAgentToggleLogger)
@@ -240,9 +242,8 @@ class ActionQueue(threading.Thread):
     '''
     commandresult = None
     
-    if 'configurations' in command:
-        if 'docker' in command['configurations']:
-            commandresult = self.dockerManager.execute_command(command)
+    if 'configurations' in command and 'docker' in command['configurations']:
+        commandresult = self.dockerManager.execute_command(command)
     else:
         commandresult = self.customServiceOrchestrator.runCommand(command,
                                                               in_progress_status[
@@ -322,9 +323,8 @@ class ActionQueue(threading.Thread):
       component = command['componentName']
       reportResult = CommandStatusDict.shouldReportResult(command)
       component_status = None
-      if 'configurations' in command:
-        if 'docker' in command['configurations']:
-            component_status = self.dockerManager.query_status(command)
+      if 'configurations' in command and 'docker' in command['configurations']:
+        component_status = self.dockerManager.query_status(command)
       else:
         component_status = self.customServiceOrchestrator.requestComponentStatus(command)
 

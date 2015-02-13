@@ -199,14 +199,10 @@ class CustomServiceOrchestrator():
 
     if command['roleCommand'] == "GET_CONFIG":
      return self.getConfig(command)
-
     else:
-      '''
       res = self.runCommand(command, self.status_commands_stdout,
                             self.status_commands_stderr,
                             override_output_files=override_output_files)
-      '''
-      res = {Constants.EXIT_CODE:0}
       if res[Constants.EXIT_CODE] == 0:
         res[Constants.EXIT_CODE] = CustomServiceOrchestrator.LIVE_STATUS
       else:
