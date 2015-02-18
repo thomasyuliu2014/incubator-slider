@@ -89,8 +89,20 @@ class DockerManager():
     
     def add_port_binding_to_command(self, docker_command, command, containerPort):
         docker_command.append("-p")
-        # fake
-        hostPort = self.customServiceOrchestrator.get_allowed_ports(command)
+        hostPort = ''
+        availableHostPorts = self.customServiceOrchestrator.get_allowed_ports(command)
+        
+        hostPortPattern = self.extract_config_from_command(command, "hostPortPattern")
+        allocated_for_this_component_format = "${{{0}.ALLOCATED_PORT}}"
+        component = command['componentName']
+        port_allocation_req = allocated_for_this_component_format.format(component)
+        # if hostportpattern is not null, then allocate one port according to the pattern
+        # if it is null, then just allocate one available port
+        if hostPortPattern and hostPortPattern == port_allocation_req:
+            allocatedPorts = self.customServiceOrchestrator.allocate_ports(value, port_allocation_req, availableHostPorts)
+            hostPort = allocatedPorts[0]
+        else:
+            hostPort = availableHostPorts[0]
         docker_command.append(hostPort+":"+containerPort)
         
     def add_mnted_dir_to_command(self, docker_command, host_dir, container_dir):
