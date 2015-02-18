@@ -77,11 +77,11 @@ class ActionQueue(threading.Thread):
     self.controller = controller
     self._stop = threading.Event()
     self.tmpdir = config.getResolvedPath(AgentConfig.APP_TASK_DIR)
-    self.dockerManager = DockerManager(self.tmpdir, config.getWorkRootPath())
     self.customServiceOrchestrator = CustomServiceOrchestrator(config,
                                                                controller,
                                                                self.queueOutAgentToggleLogger)
-
+    self.dockerManager = DockerManager(self.tmpdir, config.getWorkRootPath(), self.customServiceOrchestrator)
+    
 
   def stop(self):
     self._stop.set()
@@ -171,75 +171,6 @@ class ActionQueue(threading.Thread):
     if store_command:
       logger.info("Component has indicated auto-restart. Saving details from START command.")
         
-    '''
-    if 'configurations' in command:
-        logger.info(str( command['configurations']))
-        if 'docker' in command['configurations']:
-            logger.info(str( command['configurations']['docker']))
-            if 'docker.command_path' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.command_path'])
-                self.command_path = command['configurations']['docker']['docker.command_path']
-            if 'docker.image_name' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.image_name'])
-                self.imageName = command['configurations']['docker']['docker.image_name']
-            if 'docker.options' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.options'])
-                self.options = command['configurations']['docker']['docker.options']
-            if 'docker.container_port' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.container_port'])
-                self.containerPort = command['configurations']['docker']['docker.container_port']
-            if 'docker.mounting_directory' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.mounting_directory'])
-                self.mounting_directory = command['configurations']['docker']['docker.mounting_directory']
-            if 'docker.start_command' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.start_command'])
-                self.start_command = command['configurations']['docker']['docker.start_command']
-            if 'docker.additional_param' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.additional_param'])
-                self.additional_param = command['configurations']['docker']['docker.additional_param']
-            if 'docker.input_file.local_path' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.input_file.local_path'])
-                self.input_file_local_path = command['configurations']['docker']['docker.input_file.local_path']
-            if 'docker.input_file.mount_path' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.input_file.mount_path'])
-                self.input_file_mount_path = command['configurations']['docker']['docker.input_file.mount_path']
-    
-    if command['roleCommand'] == 'INSTALL':
-        docker_command = ["/usr/bin/docker", "pull", self.imageName]
-        logger.info("docker install: " + str(docker_command))
-        proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-        out = proc.communicate()
-        logger.info(str(out))
-        
-    if command['roleCommand'] == 'START':
-        docker_command = [self.command_path, "run"]
-        if self.options:
-            docker_command = docker_command + self.options.split(" ")
-        if self.containerPort:
-            docker_command.append("-p")
-            self.hostPort = '11911'
-            docker_command.append(self.hostPort+":"+self.containerPort)
-        if self.mounting_directory:
-            docker_command.append("-v")
-            tmp_mount_dir = self.config.getWorkRootPath()+ "/docker_use"
-            docker_command.append(tmp_mount_dir+":"+self.mounting_directory)
-        if self.input_file_local_path:
-            docker_command.append("-v")
-            localized_input = self.config.getWorkRootPath() + "/inputDir/"
-            docker_command.append(localized_input+":"+self.input_file_mount_path)
-        docker_command.append("-name")
-        docker_command.append(self.get_tmpdir())
-        docker_command.append(self.imageName)
-        if self.start_command:
-            docker_command.append(self.start_command)
-        if self.additional_param:
-            docker_command = docker_command + self.additional_param.split(" ")
-        logger.info("docker run" + str(docker_command))
-        
-        proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-        out = proc.communicate()
-        logger.info(str(out))
-    '''
     commandresult = None
     
     if 'configurations' in command and 'docker' in command['configurations']:
@@ -293,27 +224,7 @@ class ActionQueue(threading.Thread):
     return self.commandStatuses.generate_report()
 
   def execute_status_command(self, command):
-    '''
-    status_command = ''
-    if 'configurations' in command:
-        logger.info(str( command['configurations']))
-        if 'docker' in command['configurations']:
-            logger.info(str( command['configurations']['docker']))
-            if 'docker.status_command' in command['configurations']['docker']:
-                logger.info( command['configurations']['docker']['docker.status_command'])
-                status_command = command['configurations']['docker']['docker.status_command']
-                
-    logger.info("aaa status command" + str(command))
-    docker_command = ["/usr/bin/docker", "exec"]
-    docker_command.append(self.get_tmpdir())
-    docker_command.append(status_command)
-    
-    
-    proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-    out = proc.communicate()
-    logger.info("docker exec" + str(docker_command))
-    '''
-    
+        
     '''
     Executes commands of type STATUS_COMMAND
     '''

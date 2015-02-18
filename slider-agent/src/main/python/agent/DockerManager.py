@@ -8,17 +8,22 @@ logger = logging.getLogger()
 
 class DockerManager():
     
-    def __init__(self, tmpdir, workroot):
+    def __init__(self, tmpdir, workroot, customServiceOrchestrator):
         self.tmpdir = tmpdir
         self.workroot = workroot
+        self.customServiceOrchestrator = customServiceOrchestrator
     
     def execute_command(self, command):
+        returncode = ''
+        out = ''
+        err = ''
+        
         if command['roleCommand'] == 'INSTALL':
-            self.pull_image(command)
+            returncode, out, err = self.pull_image(command)
         if command['roleCommand'] == 'START':
-            self.start_container(command)    
-        # fake
-        return {Constants.EXIT_CODE:0, 'stdout':'', 'stderr':''}
+            returncode, out, err = self.start_container(command)    
+        # need check
+        return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
             
     def pull_image(self, command):
         logger.info(str( command['configurations']))
@@ -27,7 +32,7 @@ class DockerManager():
         
         docker_command = [command_path, 'pull', imageName]
         logger.info("docker pull command: " + str(docker_command))
-        self.execute_command_on_linux(docker_command)
+        return self.execute_command_on_linux(docker_command)
         
     
     def extract_config_from_command(self, command, field):
@@ -43,8 +48,10 @@ class DockerManager():
     # will evolve into a class hierarch, linux and windows
     def execute_command_on_linux(self, docker_command):
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-        out = proc.communicate()
-        logger.info("docker command output: " + str(out))
+        proc.returncode
+        out, err = proc.communicate()
+        logger.info("docker command output: " + str(out) + " err: " + str(err))
+        return proc.returncode, out, err
     
     
     def start_container(self, command):
@@ -54,6 +61,7 @@ class DockerManager():
         options = self.extract_config_from_command(command, 'docker.options')
         containerPort = self.extract_config_from_command(command, 'docker.container_port')
         mounting_directory = self.extract_config_from_command(command, 'docker.mounting_directory')
+        memory_usage = self.extract_config_from_command(command, "docker.memory_usage")
         additional_param = self.extract_config_from_command(command, 'docker.additional_param')
         input_file_local_path = self.extract_config_from_command(command, 'docker.input_file.local_path')
         input_file_mount_path = self.extract_config_from_command(command, 'docker.input_file.mount_path')
@@ -62,25 +70,27 @@ class DockerManager():
         if options:
             docker_command = self.add_docker_run_options_to_command(docker_command, options)
         if containerPort:
-            self.add_port_binding_to_command(docker_command, containerPort)
+            self.add_port_binding_to_command(docker_command, command, containerPort)
         if mounting_directory:
             self.add_mnted_dir_to_command(docker_command, "/docker_use", mounting_directory)
         if input_file_local_path:
             self.add_mnted_dir_to_command(docker_command, "/inputDir", input_file_mount_path)
+        if memory_usage:
+            self.add_resource_restriction(docker_command, memory_usage)
         self.add_container_name_to_command(docker_command)
         docker_command.append(imageName)
         if additional_param:
             docker_command = self.add_additional_param_to_command(docker_command, additional_param)
         logger.info("docker run command: " + str(docker_command))
-        self.execute_command_on_linux(docker_command)
+        return self.execute_command_on_linux(docker_command)
     
     def add_docker_run_options_to_command(self, docker_command, options):
         return docker_command + options.split(" ")
     
-    def add_port_binding_to_command(self, docker_command, containerPort):
+    def add_port_binding_to_command(self, docker_command, command, containerPort):
         docker_command.append("-p")
         # fake
-        hostPort = '11911'
+        hostPort = self.customServiceOrchestrator.get_allowed_ports(command)
         docker_command.append(hostPort+":"+containerPort)
         
     def add_mnted_dir_to_command(self, docker_command, host_dir, container_dir):
@@ -99,12 +109,15 @@ class DockerManager():
         # will make this more resilient to changes
         return self.tmpdir[-30:-2]
 
+    def add_resource_restriction(self, docker_command, memory_usage):
+        docker_command.append("-m")
+        docker_command.append(memory_usage)
     
     def query_status(self, command):
         status_command = self.extract_config_from_command(command, 'docker.status_command').split(" ")
         logger.info("status command" + str(status_command))
-        self.execute_command_on_linux(status_command)
-        #fake
-        return {Constants.EXIT_CODE:0}
+        returncode, out, err = self.execute_command_on_linux(status_command)
+        # need check
+        return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
         
         
