@@ -53,18 +53,8 @@ class ActionQueue(threading.Thread):
 
   STORE_APPLIED_CONFIG = 'record_config'
   AUTO_RESTART = 'auto_restart'
-  '''
-  command_path = ''
-  imageName = ''
-  options = ''
-  hostPort = ''
-  containerPort = ''
-  mounting_directory = ''
-  start_command = ''
-  additional_param = ''
-  input_file_local_path = ''
-  input_file_mount_path = ''
-  '''
+  
+  docker_mode = False
 
   def __init__(self, config, controller, agentToggleLogger):
     super(ActionQueue, self).__init__()
@@ -174,6 +164,7 @@ class ActionQueue(threading.Thread):
     commandresult = None
     
     if 'configurations' in command and 'docker' in command['configurations']:
+        self.docker_mode = True
         commandresult = self.dockerManager.execute_command(command)
     else:
         commandresult = self.customServiceOrchestrator.runCommand(command,
@@ -234,7 +225,7 @@ class ActionQueue(threading.Thread):
       component = command['componentName']
       reportResult = CommandStatusDict.shouldReportResult(command)
       component_status = None
-      if 'configurations' in command and 'docker' in command['configurations']:
+      if self.docker_mode:
         component_status = self.dockerManager.query_status(command)
       else:
         component_status = self.customServiceOrchestrator.requestComponentStatus(command)

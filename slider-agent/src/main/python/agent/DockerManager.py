@@ -7,6 +7,7 @@ import Constants
 logger = logging.getLogger()
 
 class DockerManager():
+    stored_status_command = ''
     
     def __init__(self, tmpdir, workroot, customServiceOrchestrator):
         self.tmpdir = tmpdir
@@ -48,7 +49,6 @@ class DockerManager():
     # will evolve into a class hierarch, linux and windows
     def execute_command_on_linux(self, docker_command):
         proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
-        proc.returncode
         out, err = proc.communicate()
         logger.info("docker command output: " + str(out) + " err: " + str(err))
         return proc.returncode, out, err
@@ -77,7 +77,7 @@ class DockerManager():
             self.add_mnted_dir_to_command(docker_command, "/inputDir", input_file_mount_path)
         if memory_usage:
             self.add_resource_restriction(docker_command, memory_usage)
-        self.add_container_name_to_command(docker_command)
+        self.add_container_name_to_command(docker_command, command)
         docker_command.append(imageName)
         if additional_param:
             docker_command = self.add_additional_param_to_command(docker_command, additional_param)
@@ -90,19 +90,14 @@ class DockerManager():
     def add_port_binding_to_command(self, docker_command, command, containerPort):
         docker_command.append("-p")
         hostPort = ''
-        availableHostPorts = self.customServiceOrchestrator.get_allowed_ports(command)
-        
-        hostPortPattern = self.extract_config_from_command(command, "hostPortPattern")
+        #this is the list of allowed port range specified in appConfig
+        allowedPorts = self.customServiceOrchestrator.get_allowed_ports(command)
+        #users don't have to specify ${component.allocated_port} in appConfig
+        #we just compose it because this is always the case
         allocated_for_this_component_format = "${{{0}.ALLOCATED_PORT}}"
         component = command['componentName']
         port_allocation_req = allocated_for_this_component_format.format(component)
-        # if hostportpattern is not null, then allocate one port according to the pattern
-        # if it is null, then just allocate one available port
-        if hostPortPattern and hostPortPattern == port_allocation_req:
-            allocatedPorts = self.customServiceOrchestrator.allocate_ports(value, port_allocation_req, availableHostPorts)
-            hostPort = allocatedPorts[0]
-        else:
-            hostPort = availableHostPorts[0]
+        hostPort = self.customServiceOrchestrator.allocate_ports(port_allocation_req, port_allocation_req, allowedPorts)
         docker_command.append(hostPort+":"+containerPort)
         
     def add_mnted_dir_to_command(self, docker_command, host_dir, container_dir):
@@ -110,14 +105,14 @@ class DockerManager():
         tmp_mount_dir = self.workroot + host_dir
         docker_command.append(tmp_mount_dir+":"+container_dir)
     
-    def add_container_name_to_command(self, docker_command):
+    def add_container_name_to_command(self, docker_command, command):
         docker_command.append("-name")
-        docker_command.append(self.get_container_id())
+        docker_command.append(self.get_container_id(command))
         
     def add_additional_param_to_command(self, docker_command, additional_param):
         return docker_command + additional_param.split(" ")
     
-    def get_container_id(self):
+    def get_container_id(self, command):
         # will make this more resilient to changes
         return self.tmpdir[-30:-2]
 
@@ -126,10 +121,16 @@ class DockerManager():
         docker_command.append(memory_usage)
     
     def query_status(self, command):
-        status_command = self.extract_config_from_command(command, 'docker.status_command').split(" ")
-        logger.info("status command" + str(status_command))
-        returncode, out, err = self.execute_command_on_linux(status_command)
-        # need check
+        returncode = ''
+        out = ''
+        err = ''
+        status_command_str = self.extract_config_from_command(command, 'docker.status_command')
+        if status_command_str:
+            self.stored_status_command = status_command_str.split(" ")
+        logger.info("status command" + str(self.stored_status_command))
+        if self.stored_status_command:
+            returncode, out, err = self.execute_command_on_linux(self.stored_status_command)
+            logger.info("status of the app in docker container: " + str(returncode) + str(out) + str(err))
         return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
         
         
