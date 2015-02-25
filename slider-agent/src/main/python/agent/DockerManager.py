@@ -132,5 +132,11 @@ class DockerManager():
             returncode, out, err = self.execute_command_on_linux(self.stored_status_command)
             logger.info("status of the app in docker container: " + str(returncode) + str(out) + str(err))
         return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
-        
+    
+    def stop_container(self):
+        docker_command = ["/usr/bin/docker", "stop"]
+        docker_command.append(self.get_container_id(docker_command))
+        logger.info("docker stop: " + str(docker_command))
+        code, out, err = self.execute_command_on_linux(docker_command)
+        logger.info("output: " + str(out))
         
