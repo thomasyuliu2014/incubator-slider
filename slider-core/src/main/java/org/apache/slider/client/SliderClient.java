@@ -663,10 +663,15 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
     sliderFileSystem.getFileSystem().copyFromLocalFile(srcPath, desPath);
     
     //copy docker input file to HDFS
-    String dockerinputfilepathurl = instanceDefinition.getAppConfOperations().getGlobalOptions().get("docker.input_file.local_path");
-    Path src = new Path(dockerinputfilepathurl);
-    Path dst = new Path(clusterDirectory.toString() + "/inputDir/input.txt");
-    sliderFileSystem.getFileSystem().copyFromLocalFile(src, dst);
+    for(String component : instanceDefinition.getAppConfOperations().getComponentNames()){
+      log.info("component: " + component + " config: " + instanceDefinition.getAppConfOperations().getComponent(component) );
+      String dockerinputfilepathurl = instanceDefinition.getAppConfOperations().getComponentOpt(component, "docker.input_file.local_path", "");
+      if(!dockerinputfilepathurl.isEmpty()){
+        Path src = new Path(dockerinputfilepathurl);
+        Path dst = new Path(clusterDirectory.toString() + "/inputDir/input.txt");
+        sliderFileSystem.getFileSystem().copyFromLocalFile(src, dst);
+      }
+    }
     
     try {
       checkForCredentials(getConfig(), instanceDefinition.getAppConf());

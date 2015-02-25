@@ -653,7 +653,7 @@ public class AgentProviderService extends AbstractProviderService implements
       response.setLog("Label not recognized.");
       log.warn("Received registration request from unknown label {}", label);
     }
-    log.info("aaa Registration response: " + response);
+    log.info("bbb Registration response: " + response);
     
     return response;
   }
@@ -773,7 +773,7 @@ public class AgentProviderService extends AbstractProviderService implements
       componentStatus.applyCommandResult(CommandResult.FAILED, command);
     }
 
-    log.debug("aaa Heartbeat response: " + response);
+    log.debug("bbb Heartbeat response: " + response);
     return response;
   }
 
@@ -1619,11 +1619,13 @@ public class AgentProviderService extends AbstractProviderService implements
     cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
     
     Map<String, String> dockerConfig = new HashMap<String, String>();
-    dockerConfig.put("docker.command_path", appConf.getGlobalOptions().get("docker.command_path"));
-    dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
+    dockerConfig.put("docker.command_path", appConf.getComponentOpt(componentName, "docker.command_path", ""));
+    dockerConfig.put("docker.image_name", appConf.getComponentOpt(componentName, "docker.image_name", ""));
+    //dockerConfig.put("docker.command_path", appConf.getGlobalOptions().get("docker.command_path"));
+    //dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
     configurations.put("docker", dockerConfig);
 
-    log.info("aaa configurationstop: " + appConf.getGlobalOptions().get("docker.image_name"));
+    log.info("bbb configurationstop: " + appConf.getComponentOpt(componentName, "docker.image_name", ""));
     
     response.addExecutionCommand(cmd);
   }
@@ -1699,13 +1701,13 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
     Map<String, String> dockerConfig = new HashMap<String, String>();
-    dockerConfig.put("docker.status_command", appConf.getGlobalOptions().get("docker.status_command"));
+    dockerConfig.put("docker.status_command", appConf.getComponentOpt(componentName, "docker.status_command", ""));
     configurations.put("docker", dockerConfig);
     
     cmd.setConfigurations(configurations);
     
-    log.info("aaa status configuration" + configurations.toString());
-    log.info("aaa status" + cmd);
+    log.info("bbb status configuration" + configurations.toString());
+    log.info("bbb status" + cmd);
 
     response.addStatusCommand(cmd);
   }
@@ -1732,13 +1734,11 @@ public class AgentProviderService extends AbstractProviderService implements
     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
     Map<String, String> dockerConfig = new HashMap<String, String>();
-    dockerConfig.put("docker.status_command", appConf.getGlobalOptions().get("docker.status_command"));
+    dockerConfig.put("docker.status_command", appConf.getComponentOpt(componentName, "docker.status_command", ""));
     configurations.put("docker", dockerConfig);
     
     cmd.setConfigurations(configurations);
-    
-    log.info("aaa getconfig param " + hostLevelParams.toString());
-    log.info("aaa getconfig command " + cmd);
+    log.info("bbb getconfig command " + cmd);
     
     response.addStatusCommand(cmd);
   }
@@ -1779,16 +1779,16 @@ public class AgentProviderService extends AbstractProviderService implements
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
     Map<String, String> dockerConfig = new HashMap<String, String>();
-    dockerConfig.put("docker.command_path", appConf.getGlobalOptions().get("docker.command_path"));
-    dockerConfig.put("docker.image_name", appConf.getGlobalOptions().get("docker.image_name"));
-    dockerConfig.put("docker.options", appConf.getGlobalOptions().get("docker.options"));
-    dockerConfig.put("docker.container_port", appConf.getGlobalOptions().get("docker.container_port"));
+    dockerConfig.put("docker.command_path", appConf.getComponentOpt(componentName, "docker.command_path", ""));
+    dockerConfig.put("docker.image_name", appConf.getComponentOpt(componentName, "docker.image_name", ""));
+    dockerConfig.put("docker.options", appConf.getComponentOpt(componentName, "docker.options", ""));
+    dockerConfig.put("docker.container_port", appConf.getComponentOpt(componentName, "docker.container_port", ""));
     //need to get memory usage restriction from resources.json as well
-    dockerConfig.put("docker.mounting_directory", appConf.getGlobalOptions().get("docker.mounting_directory"));
-    dockerConfig.put("docker.start_command", appConf.getGlobalOptions().get("docker.start_command"));
-    dockerConfig.put("docker.additional_param", appConf.getGlobalOptions().get("docker.additional_param"));
-    dockerConfig.put("docker.input_file.local_path", appConf.getGlobalOptions().get("docker.input_file.local_path"));
-    dockerConfig.put("docker.input_file.mount_path", appConf.getGlobalOptions().get("docker.input_file.mount_path"));
+    dockerConfig.put("docker.mounting_directory", appConf.getComponentOpt(componentName, "docker.mounting_directory", ""));
+    dockerConfig.put("docker.start_command", appConf.getComponentOpt(componentName, "docker.start_command", ""));
+    dockerConfig.put("docker.additional_param", appConf.getComponentOpt(componentName, "docker.additional_param", ""));
+    dockerConfig.put("docker.input_file.local_path", appConf.getComponentOpt(componentName, "docker.input_file.local_path", ""));
+    dockerConfig.put("docker.input_file.mount_path", appConf.getComponentOpt(componentName, "docker.input_file.mount_path", ""));
     configurations.put("docker", dockerConfig);
     
     cmd.setConfigurations(configurations);
@@ -1825,7 +1825,7 @@ public class AgentProviderService extends AbstractProviderService implements
         appConf, containerId, componentName);
     cmdStop.setConfigurations(configurationsStop);
     
-    log.info("aaa configurationstop: " + appConf);
+    log.info("bbb configurationstop: " + appConf);
     
     response.addExecutionCommand(cmdStop);
   }
@@ -1848,7 +1848,7 @@ public class AgentProviderService extends AbstractProviderService implements
       }
     }
     
-    log.info("aaa allocated ports" + this.allocatedPorts.get(containerId));
+    log.info("bbb allocated ports" + this.allocatedPorts.get(containerId));
     
     return this.allocatedPorts.get(containerId);
   }

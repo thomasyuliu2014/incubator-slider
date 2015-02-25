@@ -390,6 +390,7 @@ public class ConfTreeOperations {
    * @return resolved value
    */
   public String getComponentOpt(String name, String option, String defVal) {
+    
     MapOperations roleopts = getComponent(name);
     if (roleopts == null) {
       return defVal;
