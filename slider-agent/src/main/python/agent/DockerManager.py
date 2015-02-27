@@ -8,17 +8,22 @@ logger = logging.getLogger()
 
 class DockerManager():
     stored_status_command = ''
+    stored_command = ''
     
     def __init__(self, tmpdir, workroot, customServiceOrchestrator):
         self.tmpdir = tmpdir
         self.workroot = workroot
         self.customServiceOrchestrator = customServiceOrchestrator
     
-    def execute_command(self, command):
+    def execute_command(self, command, store_command=False):
         returncode = ''
         out = ''
         err = ''
         
+        if store_command:
+            logger.info("Storing applied config: " + str(command['configurations']))
+            self.stored_command = command
+
         if command['roleCommand'] == 'INSTALL':
             returncode, out, err = self.pull_image(command)
         if command['roleCommand'] == 'START':
@@ -89,15 +94,15 @@ class DockerManager():
     
     def add_port_binding_to_command(self, docker_command, command, containerPort):
         docker_command.append("-p")
-        hostPort = ''
-        #this is the list of allowed port range specified in appConfig
-        allowedPorts = self.customServiceOrchestrator.get_allowed_ports(command)
-        #users don't have to specify ${component.allocated_port} in appConfig
-        #we just compose it because this is always the case
-        allocated_for_this_component_format = "${{{0}.ALLOCATED_PORT}}"
-        component = command['componentName']
-        port_allocation_req = allocated_for_this_component_format.format(component)
-        hostPort = self.customServiceOrchestrator.allocate_ports(port_allocation_req, port_allocation_req, allowedPorts)
+        hostPort = self.extract_config_from_command(command, 'docker.host_port')
+        if not hostPort:
+            #this is the list of allowed port range specified in appConfig
+            allowedPorts = self.customServiceOrchestrator.get_allowed_ports(command)
+            #if the user specify hostPort in appConfig, then we use it, otherwise allocate it
+            allocated_for_this_component_format = "${{{0}.ALLOCATED_PORT}}"
+            component = command['componentName']
+            port_allocation_req = allocated_for_this_component_format.format(component)
+            hostPort = self.customServiceOrchestrator.allocate_ports(port_allocation_req, port_allocation_req, allowedPorts)
         docker_command.append(hostPort+":"+containerPort)
         
     def add_mnted_dir_to_command(self, docker_command, host_dir, container_dir):
@@ -121,17 +126,48 @@ class DockerManager():
         docker_command.append(memory_usage)
     
     def query_status(self, command):
-        returncode = ''
-        out = ''
-        err = ''
-        status_command_str = self.extract_config_from_command(command, 'docker.status_command')
-        if status_command_str:
-            self.stored_status_command = status_command_str.split(" ")
-        logger.info("status command" + str(self.stored_status_command))
-        if self.stored_status_command:
-            returncode, out, err = self.execute_command_on_linux(self.stored_status_command)
-            logger.info("status of the app in docker container: " + str(returncode) + str(out) + str(err))
-        return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
+        if command['roleCommand'] == "GET_CONFIG":
+            return self.getConfig(command)
+        else:
+            returncode = ''
+            out = ''
+            err = ''
+            status_command_str = self.extract_config_from_command(command, 'docker.status_command')
+            if status_command_str:
+                self.stored_status_command = status_command_str.split(" ")
+            logger.info("status command" + str(self.stored_status_command))
+            if self.stored_status_command:
+                returncode, out, err = self.execute_command_on_linux(self.stored_status_command)
+                logger.info("status of the app in docker container: " + str(returncode) + str(out) + str(err))
+            return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
+    
+    def getConfig(self, command):
+        logger.info("get config command: " + str(command))
+        if 'configurations' in self.stored_command:
+          if 'commandParams' in command and 'config_type' in command['commandParams']:
+            config_type = command['commandParams']['config_type']
+            logger.info("Requesting applied config for type {0}".format(config_type))
+            if config_type in self.stored_command['configurations']:
+              logger.info("get config result: " + self.stored_command['configurations'][config_type])
+              return {
+                'configurations': {config_type: self.stored_command['configurations'][config_type]}
+              }
+            else:
+              return {
+                'configurations': {}
+              }
+            pass
+          else:
+            logger.info("Requesting all applied config." + str(self.stored_command['configurations']))
+            return {
+              'configurations': self.stored_command['configurations']
+            }
+          pass
+        else:
+          return {
+            'configurations': {}
+          }
+    pass
     
     def stop_container(self):
         docker_command = ["/usr/bin/docker", "stop"]

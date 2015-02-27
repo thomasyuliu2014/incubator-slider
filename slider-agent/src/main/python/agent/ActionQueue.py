@@ -165,7 +165,7 @@ class ActionQueue(threading.Thread):
     
     if 'configurations' in command and 'docker' in command['configurations']:
         self.docker_mode = True
-        commandresult = self.dockerManager.execute_command(command)
+        commandresult = self.dockerManager.execute_command(command, store_config or store_command)
     else:
         commandresult = self.customServiceOrchestrator.runCommand(command,
                                                               in_progress_status[

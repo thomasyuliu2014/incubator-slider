@@ -20,6 +20,7 @@ package org.apache.slider.providers.agent;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -391,7 +392,13 @@ public class AgentProviderService extends AbstractProviderService implements
       localizeServiceKeytabs(launcher, instanceDefinition, fileSystem);
     }
     
-    localizeDockerInputFiles(launcher, instanceDefinition, fileSystem);
+    for(String component : instanceDefinition.getAppConfOperations().getComponentNames()){
+      log.info("agentproviderservice component: " + component + " config: " + instanceDefinition.getAppConfOperations().getComponent(component) );
+      String dockerinputfilepathurl = instanceDefinition.getAppConfOperations().getComponentOpt(component, "docker.input_file.local_path", "");
+      if(!dockerinputfilepathurl.isEmpty()){
+        localizeDockerInputFiles(launcher, instanceDefinition, fileSystem);
+      }
+    }    
 
     MapOperations amComponent = instanceDefinition.
         getAppConfOperations().getComponent(SliderKeys.COMPONENT_AM);
@@ -1778,12 +1785,14 @@ public class AgentProviderService extends AbstractProviderService implements
 
     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
 
+    //to be refactored
     Map<String, String> dockerConfig = new HashMap<String, String>();
     dockerConfig.put("docker.command_path", appConf.getComponentOpt(componentName, "docker.command_path", ""));
     dockerConfig.put("docker.image_name", appConf.getComponentOpt(componentName, "docker.image_name", ""));
     dockerConfig.put("docker.options", appConf.getComponentOpt(componentName, "docker.options", ""));
     dockerConfig.put("docker.container_port", appConf.getComponentOpt(componentName, "docker.container_port", ""));
-    //need to get memory usage restriction from resources.json as well
+    dockerConfig.put("docker.host_port", appConf.getComponentOpt(componentName, "docker.host_port", ""));
+    
     dockerConfig.put("docker.mounting_directory", appConf.getComponentOpt(componentName, "docker.mounting_directory", ""));
     dockerConfig.put("docker.start_command", appConf.getComponentOpt(componentName, "docker.start_command", ""));
     dockerConfig.put("docker.additional_param", appConf.getComponentOpt(componentName, "docker.additional_param", ""));
