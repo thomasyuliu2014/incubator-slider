@@ -95,8 +95,7 @@ class Controller(threading.Thread):
     self.appGracefulStopQueued = False
     self.appGracefulStopTriggered = False
     self.tags = ""
-    self.docker_container = ""
-
+    
 
   def __del__(self):
     logger.info("Server connection disconnected.")
